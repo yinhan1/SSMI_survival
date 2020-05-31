@@ -1,0 +1,221 @@
+---
+title: "Larva Analysis"
+author: "Han Yin"
+date: "10/25/2018"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+### set up parameters
+```{r}
+B = 5
+```
+
+```{r warning=FALSE, include=FALSE}
+library(tidyverse)
+library(reshape2)
+library(stringr)
+thm = theme(axis.line = element_line(colour="gray54", size=0.1, linetype="solid"),
+            panel.background = element_rect(fill = NA),
+            legend.key = element_rect(fill = NA), 
+            legend.background = element_rect(fill = NA),
+            plot.title = element_text(size = 15, hjust = 0.5))
+```
+
+### Import data file
+
+```{r echo=FALSE}
+group_cohabit = function(tb){
+  cohabit = tb %>% filter(Mating_status == "Cohabit") %>% 
+    group_by(Replicate,Day,Treatment) %>% 
+    summarise(Larva = sum(Larva), Survival = sum(Survival)) %>% 
+    mutate(Mating_status = "Cohabit") %>% 
+    select(c(Replicate, Day, Treatment, Mating_status, Survival, Larva))
+  no_cohabit = tb %>% filter(Mating_status != "Cohabit") %>% 
+    select(c(Replicate, Day, Treatment, Mating_status, Survival, Larva))
+  tb = rbind(as.data.frame(cohabit), no_cohabit) %>%  
+    arrange(Replicate, Treatment, Mating_status, Day)
+  return(tb)
+}
+
+larva_per_surv = function(tb){
+  tb$larva_per_surv = tb$Larva/tb$survival
+  return(tb)
+}
+```
+
+```{r echo=FALSE}
+rep_12 = 
+  readxl::read_excel("./data/Replicate 1 & 2 for R_SSMI.xlsx") %>% 
+  filter(`Larval Viability` != "N/A") %>% 
+  select(-c(Eggs, Cage_Number, Percent_survival, Death,Sex))
+
+rep_4 = 
+  readxl::read_excel("./data/Replicate 4_R.xlsx") %>% 
+  filter(`Larva Count` != "NA") %>% 
+  select(-c(Cage_Number, Percent_survival, Death,Sex))
+
+rep_5 = 
+  readxl::read_excel("./data/SSMI rep 5_raw.xlsx") %>% 
+  filter(`Larva Count` != "N/A") %>%
+  separate(`Reproduction/Sex`, c("Mating_status", "Sex"), " ", remove = TRUE) %>% 
+  mutate(Replicate = 5, Population = "H3",
+         Sex = "F") %>%
+  select(Replicate, Population, Treatment, Day, Mating_status, `Female Survival`, `Larva Count`)
+
+names(rep_4) = names(rep_5) = names(rep_12)
+
+reps = 
+  rbind(rep_12, rep_4, rep_5) %>% 
+  filter(Survival!=0, Day!=1) %>% 
+  mutate(Larva = as.numeric(`Larval Viability`)) %>% 
+  select(Replicate, Day, Treatment, Mating_status, Survival, Larva) %>% 
+  group_cohabit() %>%
+  mutate(larvaPsurv = Larva/Survival, tag = paste(Treatment, Mating_status)) %>% 
+  mutate_at(.vars = vars("Replicate", "Treatment","Mating_status","tag"), .funs = funs(factor))
+
+summary(reps)
+```
+
+```{r echo=FALSE}
+test = reps %>% group_by(Treatment, Mating_status) %>% 
+  summarise(grp.mean = mean(larvaPsurv)) %>% 
+  mutate(tag = paste(Treatment, Mating_status))
+
+ggplot(reps, aes(x=larvaPsurv)) + facet_wrap(~tag) +
+  geom_histogram(bins=30, color="black", fill="white") + 
+  geom_vline(data=test, aes(xintercept=grp.mean),
+            color="blue", linetype="dashed", size=1) +
+  scale_colour_hue(name = " ",labels = c("Mean")) +
+  labs(title = "Offspring Counts per Survival Female", 
+       x="The number of offsprings", y="Frequency") + thm
+```
+
+# permutation & rank sum test: track control 
+```{r echo=FALSE}
+w_calculator = function(tb){
+  tb$ranks = tb$larvaPsurv %>% rank()
+  w = sum(tb$ranks[tb$Treatment == "Control"])
+  return(w)
+}
+w_calculator1 = function(tb){
+  tb$ranks = tb$larvaPsurv %>% rank()
+  w = sum(tb$ranks[tb$Mating_status == "Cohabit"])
+  return(w)
+}
+permuation_shuffle = function(tb, n_total, n_control){
+  rows_to_take = sample(n_total, n_control, replace=FALSE)
+  new_control= tb[rows_to_take, ] %>% mutate(Treatment="Control")
+  new_fungal = tb[-rows_to_take, ] %>% mutate(Treatment="Fungal")
+  new = rbind(new_control, new_fungal)
+  return(new)
+}
+permuation_shuffle1 = function(tb, n_total, n_cohabit){
+  rows_to_take = sample(n_total, n_cohabit, replace=FALSE)
+  new_cohabit= tb[rows_to_take, ] %>% mutate(Mating_status="Cohabit")
+  new_mated = tb[-rows_to_take, ] %>% mutate(Mating_status="Mated")
+  new = rbind(new_cohabit, new_mated)
+  return(new)
+}
+p_calculator = function(tb){
+  n_total = nrow(tb)
+  n_control = sum(tb$Treatment == "Control")
+  w = c()
+  for (i in 1:B){
+    w_i = tb %>% permuation_shuffle(n_total, n_control) %>% w_calculator()
+    w = append(w, w_i)
+  }
+  w_obs = tb %>% w_calculator()
+  p_val = sum(w_obs<w)/B
+  return(p_val)
+}
+p_calculator1 = function(tb){
+  n_total = nrow(tb)
+  n_cohabit = sum(tb$Mating_status == "Cohabit")
+  w = c()
+  for (i in 1:B){
+    w_i = tb %>% permuation_shuffle1(n_total, n_cohabit) %>% w_calculator1()
+    w = append(w, w_i)
+  }
+  w_obs = tb %>% w_calculator1()
+  p_val = sum(w_obs<w)/B
+  return(p_val)
+}
+```
+
+```{r}
+reps %>% filter(Mating_status == "Cohabit") %>% p_calculator()  # 0
+reps %>% filter(Mating_status == "Mated") %>% p_calculator()  # 6e-05
+reps %>% filter(Treatment == "Control") %>% p_calculator1()
+reps %>% filter(Treatment == "Fungal") %>% p_calculator1()
+```
+
+# anova
+```{r}
+mod = lm(larvaPsurv ~ Day + Treatment + Mating_status + 
+           Treatment:Mating_status + Day:Treatment, reps)
+anova(mod)
+```
+
+```{r}
+tb_fit = reps %>% select(Day, Treatment, Mating_status) %>% unique()
+tb_fit = cbind(tb_fit, predict(mod, tb_fit, interval = "confidence"))
+```
+
+```{r}
+# ggplot() +
+#   geom_point(data=tb_fit, aes(x=Day, y=fit), size=0.3) + 
+#   geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr), size=0.5, width=0.4) +
+#   geom_bar(data=reps, aes(x=Day, y=larvaPsurv), stat="identity", bins=30, alpha=0.4) + 
+#   geom_hline(data=test, aes(yintercept=grp.mean),
+#             color="blue", linetype="dashed", size=1.4, alpha=0.5) +
+#   facet_wrap(Treatment~Mating_status) +
+#   scale_colour_hue(name = " ",labels = c("Mean")) +
+#   labs(title = "Offspring Counts per Survival Female", 
+#        x="Days", y="Counts") + thm
+```
+
+```{r}
+# ggplot() +
+#   geom_point(data=tb_fit, aes(x=Day, y=fit, linetype=Treatment, color=Mating_status), size=1) + 
+#   geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr,
+#                                  linetype=Treatment, color=Mating_status), size=0.5, width=0.4) +
+#   scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid"))
+#   # geom_hline(data=test, aes(yintercept=grp.mean), color="blue", linetype="dashed", size=1.4, alpha=0.5)
+```
+
+```{r}
+# ggplot() +
+#   geom_point(data=tb_fit, aes(x=Day, y=fit, linetype=Treatment, color=Mating_status), size=1) + 
+#   geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr,
+#                                  linetype=Treatment, color=Mating_status), size=0.5, width=0.4) +
+#   scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
+#   # geom_hline(data=test, aes(yintercept=grp.mean), color="blue", linetype="dashed", size=1.4, alpha=0.5)
+#   facet_wrap(~Treatment)
+```
+
+```{r}
+ggplot(data=tb_fit, 
+       aes(x=Day, y=fit, ymin=lwr, ymax=upr,
+           linetype=Treatment, color=Mating_status, group=interaction(Treatment,Mating_status))) +
+  geom_line(size=1.2, show.legend=FALSE) +
+  geom_point(size=1.5, show.legend=FALSE) + 
+  geom_errorbar(size=0.5, width=0.5, show.legend=FALSE) +
+
+  scale_linetype_manual(values=c("Control"="dashed","Fungal"="solid")) +
+  scale_color_manual(values = c("Cohabit"="#006400", "Mated"="#64B39B")) +
+  thm +
+  labs(x="Days after spray", y="Offspring count per surviving female")
+```
+
+# ```{r}
+# ggplot() +
+#   geom_point(data=tb_fit, aes(x=Day, y=fit, linetype=Treatment, color=Mating_status), size=1.5) + 
+#   geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr,
+#                                  linetype=Treatment, color=Mating_status), size=0.5, width=0.5) +
+#   scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
+#   # geom_hline(data=test, aes(yintercept=grp.mean), color="blue", linetype="dashed", size=1.4, alpha=0.5)
+#   facet_wrap(~Mating_status)
+```

@@ -1,0 +1,440 @@
+---
+title: "SSMI Diet Analysis"
+author: "Han Yin"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  html_document:
+    fig_caption: yes
+    fig_crop: no
+    number_sections: no
+    toc: no
+header-includes:
+- \usepackage{graphicx}
+- \usepackage{float}
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+# set global chunk options
+knitr::opts_chunk$set(
+	fig.align = "center",
+	fig.pos = "H",
+	message = FALSE,
+	warning = FALSE,
+	external = TRUE
+)
+```
+
+
+### Step 0: import data
+```{r}
+library(tidyverse)
+library(fastDummies)
+
+library(survival)
+library(survminer)
+
+setwd("/Users/hanyin/Dropbox (CSU Fullerton)/Research Project/Flies/Kshama -- statistical analysis/Diet #1")
+rep_1 = readxl::read_excel("data/SSMI_Diet_Rep1_for R.xlsx")
+rep_2 = readxl::read_excel("data/SSMI_Diet_Rep2_for R.xlsx")
+rep_3 = readxl::read_excel("data/SSMI_Diet_Rep3_for R.xlsx")
+
+reps = rbind(rep_1, rep_2, rep_3)
+
+cols_to_factor = c("Replicate","Population","Cage_Number","Diet","Treatment","Sex")
+reps = reps %>% mutate_at(cols_to_factor, factor) %>% filter(Day<=12)
+```
+
+
+### Step 0.1: raw data plot
+```{r}
+# combine replicate
+df0 = reps %>% 
+  group_by(Treatment,Diet,Sex,Day) %>% 
+  summarise(Death = sum(Death),
+            Initial = sum(`Initial density`)) %>%
+  group_by(Treatment,Diet,Sex) %>%
+  mutate(Death = cumsum(Death)) %>% 
+  ungroup() %>%
+  mutate(survPer = 1 - Death/Initial) %>% 
+  select(-c(Initial,Death))
+
+df_raw = df0 %>% select(Treatment,Diet,Sex) %>% unique() %>%
+  mutate(Day = 0, survPer = 1) %>% 
+  bind_rows(df0)
+
+
+ggplot(df_raw, aes(x=Day, y=survPer, linetype=Treatment, color=Diet,
+                   group=interaction(Treatment,Diet,Sex))) +
+  geom_line() + 
+  facet_grid(~Diet)
+```
+
+```{r}
+# by replicate
+df0 = reps %>% 
+  group_by(Replicate,Treatment,Diet,Sex,Day) %>% 
+  summarise(Death = sum(Death),
+            Initial = sum(`Initial density`)) %>%
+  group_by(Replicate,Treatment,Diet,Sex) %>%
+  mutate(Death = cumsum(Death)) %>% 
+  ungroup() %>%
+  mutate(survPer = 1 - Death/Initial) %>% 
+  select(-c(Initial,Death))
+
+df_plot = df0 %>% select(Replicate,Treatment,Diet,Sex) %>% unique() %>%
+  mutate(Day = 0, survPer = 1) %>% 
+  bind_rows(df0) 
+
+ggplot(df_plot, aes(x=Day, y=survPer, linetype=Treatment, color=Diet)) +
+  geom_line() +
+  facet_grid(Replicate~Sex)
+```
+
+
+### Step 1: convert death count to status
+```{r}
+n = nrow(reps)
+dead = reps[rep(1:n, reps$Death),] %>% 
+  mutate(Death = 1) %>%
+  select(-`Initial density`)
+
+alive = reps %>%
+  group_by(Replicate,Population,Cage_Number,Diet,Treatment,Sex) %>%
+  summarise(Alive = max(`Initial density`) - sum(Death)) %>%
+  mutate(Day = max(reps$Day), Death = 0) 
+n = nrow(alive)
+alive = alive[rep(1:n, alive$Alive),] %>% 
+  select(Replicate,Population,Cage_Number,Diet,Treatment,Day,Sex,Death)
+  
+df = bind_rows(dead, alive) %>%
+  mutate(Diet = recode(Diet, 
+                       "C, Cornmeal"="C_C", "C, Cornmeal + Yeast"="C_CY",
+                       "C+Y, Cornmeal"="CY_C","C+Y, Cornmeal + Yeast"="CY_CY",
+                       "G, Glucose"="G_G")) %>%
+  dummy_cols("Diet") %>% 
+  mutate(Fungal = (Treatment=="Fungal")+0,
+         Male = (Sex=="M")+0)
+```
+
+
+### Step 2: check replicates (good)
+```{r}
+fit = survfit(Surv(Day, Death) ~ Replicate, data = df)
+ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+pairwise_survdiff(Surv(Day, Death == 1) ~ Replicate, p.adjust.method = "holm", data = df)
+```
+
+
+### Step 3: cox model
+```{r}
+# check proportionality
+mod = coxph(Surv(Day, Death) ~ Treatment + Sex + Diet, data = df)
+cox.zph(mod)
+
+# find splitting point
+mod = coxph(Surv(Day, Death) ~ strata(Treatment) + Sex + Diet, data = df)
+pred = survfit(mod)
+plot(pred, lty = 1:2, col = c("red","blue"))
+
+mod = coxph(Surv(Day, Death) ~ Treatment + strata(Sex) + Diet, data = df)
+pred = survfit(mod)
+plot(pred, lty = 1:2, col = c("red","blue"))
+
+mod = coxph(Surv(Day, Death) ~ Treatment + Sex + strata(Diet), data = df)
+pred = survfit(mod)
+plot(pred, col = c("red","blue","orange","black","green"))
+```
+
+```{r}
+# split now
+a1 = 4; a2 = 9
+split_time = c(a1,a2)
+df2 = survSplit(df, cut=split_time, end="Day", event="Death", start="Start") %>%
+  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0)
+mod = coxph(Surv(Start, Day, Death) ~ 
+              Fungal:gt1 + Fungal:gt2 + Fungal:gt3 +
+              Male:gt1 + Male:gt2 + Male:gt3 + 
+              Fungal:Male:gt1 + Fungal:Male:gt2 + Fungal:Male:gt3 +
+              
+              Male:Diet_C_C:gt1 + Male:Diet_C_C:gt2 + Male:Diet_C_C:gt3 + 
+              Male:Diet_CY_CY:gt1 + Male:Diet_CY_CY:gt2 + Male:Diet_CY_CY:gt3 +
+              Male:Diet_CY_C:gt1 + Male:Diet_CY_C:gt2 + Male:Diet_CY_C:gt3 + 
+              Male:Diet_G_G:gt1 + Male:Diet_G_G:gt2 + Male:Diet_G_G:gt3 + 
+              
+              Fungal:Diet_C_C:gt1 + Fungal:Diet_C_C:gt2 + Fungal:Diet_C_C:gt3 + 
+              Fungal:Diet_CY_CY:gt1 + Fungal:Diet_CY_CY:gt2 + Fungal:Diet_CY_CY:gt3 +  
+              Fungal:Diet_CY_C:gt1 + Fungal:Diet_CY_C:gt2 + Fungal:Diet_CY_C:gt3 + 
+              Fungal:Diet_G_G:gt1 + Fungal:Diet_G_G:gt2 + Fungal:Diet_G_G:gt3 + 
+              
+              Fungal:Male:Diet_C_C:gt1 + Fungal:Male:Diet_C_C:gt2 + Fungal:Male:Diet_C_C:gt3 + 
+              Fungal:Male:Diet_CY_CY:gt1 + Fungal:Male:Diet_CY_CY:gt2 + Fungal:Male:Diet_CY_CY:gt3 +
+              Fungal:Male:Diet_CY_C:gt1 + Fungal:Male:Diet_CY_C:gt2 + Fungal:Male:Diet_CY_C:gt3 + 
+              Fungal:Male:Diet_G_G:gt1 + Fungal:Male:Diet_G_G:gt2 + Fungal:Male:Diet_G_G:gt3, 
+            data = df2)
+# cox.zph(mod)
+summary(mod)
+# extractAIC(mod)
+```
+
+
+### 4. Table of Hazard Ratios
+
+```{r}
+beta = coef(mod)
+diff = c(0,0,0, # fungal
+         0,0,0, # male
+         0,0,0, # fungal male
+         
+         0,0,0, # male cc
+         0,0,0, # male cycy
+         0,0,0, # male cyc
+         0,0,0, # male gg
+         
+         0,0,0, # fungal cc
+         0,0,0, # fungal cycy
+         0,0,0, # fungal cyc
+         0,0,1, # fungal gg
+         
+         0,0,0, # fungal male cc
+         0,0,0, # fungal male cycy
+         0,0,0, # fungal male cyc
+         0,0,0 # fungal male gg
+         )
+
+t_obs = (beta%*%diff) / sqrt(t(diff) %*% vcov(mod) %*% diff)
+c(exp(beta%*%diff),
+2*(1-pt(abs(t_obs), length(beta))))
+```
+
+
+```{r}
+# add interaction terms
+int_eff = function(data){
+  data= survSplit(data, cut=split_time, end="Day", event="Death", start="Start") %>%
+    mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+           t1_fun = Fungal*gt1, t2_fun = Fungal*gt2, t3_fun = Fungal*gt3,
+           t1_f = Male*gt1, t2_f = Male*gt2, t3_f = Male*gt3,
+           t1_cc = Diet_C_C*gt1, t2_cc = Diet_C_C*gt2, t3_cc = Diet_C_C*gt3,
+           t1_cyc = Diet_CY_C*gt1, t2_cyc = Diet_CY_C*gt2, t3_cyc = Diet_CY_C*gt3,
+           t1_cycy = Diet_CY_CY*gt1, t2_cycy = Diet_CY_CY*gt2, t3_cycy = Diet_CY_CY*gt3,
+           t1_g = Diet_G_G*gt1, t2_g = Diet_G_G*gt2, t3_g = Diet_G_G*gt3,
+           m_cycy = Male*Diet_CY_CY,
+           t1_m_cycy = Male*Diet_CY_CY*gt1, 
+           t2_m_cycy = Male*Diet_CY_CY*gt2, 
+           t3_m_cycy = Male*Diet_CY_CY*gt3, 
+           f_cc = Fungal*Diet_C_C, f_cyc = Fungal*Diet_CY_C, 
+           f_cycy = Fungal*Diet_CY_CY, f_g = Fungal*Diet_G_G,
+           f_m_cycy = Fungal*Male*Diet_CY_CY,
+           t1_f_m_cycy = Fungal*Male*Diet_CY_CY*gt1,
+           t2_f_m_cycy = Fungal*Male*Diet_CY_CY*gt2,
+           t3_f_m_cycy = Fungal*Male*Diet_CY_CY*gt3,
+           f_m_gg = Fungal*Male*Diet_G_G, 
+           f_m = Fungal*Male
+           )
+  return(data)
+}
+```
+
+
+```{r}
+cat = df %>% select(Fungal, Male, Diet, Diet_C_C, Diet_CY_C, Diet_CY_CY, Diet_G_G) %>% unique()
+time_intervals = data.frame(Start=c(0,a1,a2), Day=c(a1,a2,12), gt1=c(1,0,0), gt2=c(0,1,0), Death=0)
+
+pred_surv = function(data){
+  mod = coxph(Surv(Start, Day, Death) ~ Fungal + t1_fun + t2_fun + 
+                Male + t1_f + t2_f + 
+                Diet_C_C + t1_cc + t2_cc +
+                Diet_CY_C + t1_cyc + t2_cyc +
+                Diet_CY_CY + t1_cycy + t2_cycy + 
+                Diet_G_G + t1_g + t2_g + 
+                m_cycy + t1_m_cycy + t2_m_cycy +
+                f_cc + f_cyc + f_cycy + f_g + 
+                f_m_cycy + t1_f_m_cycy + t2_f_m_cycy +
+                f_m_gg + f_m,
+              data = int_eff(data))
+  surv = c()
+  for (i in 1:nrow(cat)){
+    test = data.frame(cat[i,], time_intervals, row.names = NULL) %>%
+      mutate(t1_fun = Fungal*gt1, t2_fun = Fungal*gt2,
+             t1_f = Male*gt1, t2_f = Male*gt2,
+             t1_cc = Diet_C_C*gt1, t2_cc = Diet_C_C*gt2,
+             t1_cyc = Diet_CY_C*gt1, t2_cyc = Diet_CY_C*gt2,
+             t1_cycy = Diet_CY_CY*gt1, t2_cycy = Diet_CY_CY*gt2,
+             t1_g = Diet_G_G*gt1, t2_g = Diet_G_G*gt2, 
+             f_m_gg = Fungal*Male*Diet_G_G, 
+             m_cycy = Male*Diet_CY_CY,
+             t1_m_cycy = Male*Diet_CY_CY*gt1, 
+             t2_m_cycy = Male*Diet_CY_CY*gt2, 
+             f_cc = Fungal*Diet_C_C, f_cyc = Fungal*Diet_CY_C, 
+             f_cycy = Fungal*Diet_CY_CY, f_g = Fungal*Diet_G_G,
+             f_m_cycy = Fungal*Male*Diet_CY_CY,
+             t1_f_m_cycy = Fungal*Male*Diet_CY_CY*gt1,
+             t2_f_m_cycy = Fungal*Male*Diet_CY_CY*gt2,
+             f_m = Fungal*Male
+             )
+    time = summary(survfit(mod, newdata = test, individual = TRUE))$time
+    insert = setdiff(1:12, time)
+    time = c(time, insert)
+    est = c(1, summary(survfit(mod, newdata = test, individual = TRUE))$surv,
+            rep(NA, length(insert)))
+    surv_i = data.frame(cat[i,], est, day = c(0,time)) %>% arrange(day)
+    surv = rbind(surv, surv_i)
+  }
+  return(surv)
+}
+est = pred_surv(df)
+```
+
+
+### 5. Bootstrap
+
+```{r}
+B = 200
+bound = 0.95
+
+# function to extract bounds
+
+ci_calculator = function(tb){
+  a = data.frame(lower = as.numeric(), upper = as.numeric())
+  for (i in 1:max(tb$Day)+1) {
+    a[i,1] = quantile(tb$est[tb$Day == i-1], (1-bound)/2, na.rm = TRUE)
+    a[i,2] = quantile(tb$est[tb$Day == i-1], (1+bound)/2, na.rm = TRUE)
+  }
+  return(a)
+}
+
+# repeat B times
+dummy = c()
+for (i in 1:B){
+  dummy_i = c()
+  for (j in 1:nrow(cat)){
+    dummy_ij = merge(df, cat[j,])
+    a = nrow(dummy_ij)
+    rows_to_take = sample(a, a, replace = TRUE)
+    dummy_i = rbind(dummy_i, dummy_ij[rows_to_take,])
+    }
+  dummy_i = pred_surv(dummy_i)
+  dummy = rbind(dummy, dummy_i)
+}
+
+# get confidence intervals
+survs = c()
+for (i in 1:nrow(cat)){
+  ci = merge(dummy, cat[i,]) %>% mutate(Day=day) %>% ci_calculator()
+  surv = merge(est, cat[i,]) %>% arrange(day)
+  surv = cbind(surv, ci)
+  survs = rbind(survs, surv)
+}
+
+# recode labels
+df_plot = survs %>% 
+  select(Fungal,Male,Diet,day,est,lower,upper) %>% 
+  mutate(Treatment = ifelse(Fungal==1,"Fungal","Control"),
+         Sex = ifelse(Male==1,"Male","Female"),
+         Diet = gsub("_","/",Diet))
+# write.csv(df_plot, "DIET 1 bootstrap.csv")
+```
+
+
+
+### survival plot
+
+```{r}
+set_line_size = 1    
+set_point_size = 2.5
+
+set_err_size = 0.7    
+set_err_width = 0.3   
+set_alpha = 0.7
+
+
+# female
+df_plot %>% 
+  filter(Sex=="Female") %>%
+  ggplot(aes(x=day, y=est, linetype=Treatment, color=Diet, ymin=lower, ymax=upper,
+             group=interaction(Sex,Diet,Treatment))) +
+  geom_line(size = set_line_size) + geom_point(size = set_point_size, shape=17) + 
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
+  labs(x="Day",y="Survival Probability",
+       linetype="",shape="",color="") +
+  theme_classic()
+
+# male
+df_plot %>% 
+  filter(Sex=="Male") %>%
+  ggplot(aes(x=day, y=est, linetype=Treatment, color=Diet, ymin=lower, ymax=upper,
+             group=interaction(Sex,Diet,Treatment))) +
+  geom_line(size = set_line_size) + geom_point(size = set_point_size, shape=19) + 
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
+  labs(x="Day",y="Survival Probability",
+       linetype="",shape="",color="") +
+  theme_classic()
+```
+
+```{r}
+# both male and female
+df_plot %>% 
+  ggplot(aes(x=day, y=est, linetype=Treatment, color=Diet, ymin=lower, ymax=upper,
+             shape=Sex, group=interaction(Sex,Diet,Treatment))) +
+  geom_line(size = 0.8) + geom_point(size = 2) + 
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = 0.5) +
+  scale_linetype_manual(values=c("Control"="dashed","Fungal"="solid")) +
+  scale_shape_manual(values=c("Female"=17,"Male"=19)) +
+  labs(x="Day",y="Survival Probability",
+       linetype="",shape="",color="") +
+  theme_classic()
+```
+
+```{r}
+# by Diet
+df_plot %>% 
+  ggplot(aes(x=day, y=est, linetype=Treatment, color=Diet, ymin=lower, ymax=upper,
+             shape=Sex, group=interaction(Sex,Diet,Treatment))) +
+  geom_line(size = 0.8, alpha=0.7) + geom_point(size = 1.8) + 
+  geom_errorbar(size = 0.8, width = 0.5, alpha = 0.5) +
+  scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
+  scale_shape_manual(values=c("Female"=17,"Male"=19)) +
+  labs(x="Day",y="Survival Probability",
+       linetype="",shape="",color="") +
+  facet_grid(~Diet) +
+  theme_classic()
+```
+
+
+### hazard table
+
+```{r}
+mod = coxph(Surv(Start, Day, Death) ~ t1_fun + t2_fun + t3_fun + 
+                t1_f + t2_f + t3_f +
+                t1_cc + t2_cc + t3_cc + 
+                t1_cyc + t2_cyc + t3_cyc +
+                t1_cycy + t2_cycy + t3_cycy +
+                t1_g + t2_g + t3_g + 
+                t1_m_cycy + t2_m_cycy + t3_m_cycy + 
+                f_cc + f_cyc + f_cycy + f_g +
+                t1_f_m_cycy + t2_f_m_cycy + t3_f_m_cycy +
+                f_m_gg + f_m,
+              data = int_eff(df))
+beta = coef(mod)
+diff = c(0,0,0, # fungal
+         0,0,0, # male
+         0,0,1, # c_c
+         0,0,0, # cy_c
+         0,0,0, # cy_cy
+         0,0,0, # g_g
+         0,0,0, # male*cy_cy
+         1,0,0,0, # fungal*diet: cc, cyc, cycy, gg
+         0,0,0, # fungal*male*cy_cy 
+         0,      # fungal*male*g_g
+         0      # fungal*male 
+         )
+
+t_obs = (beta%*%diff) / sqrt(t(diff) %*% vcov(mod) %*% diff)
+exp(beta%*%diff)
+2*(1-pt(abs(t_obs), length(beta)))
+```
+

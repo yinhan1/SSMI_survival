@@ -1,0 +1,1053 @@
+---
+title: "Kshama's Data Analysis"
+author: "Han Yin"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r setup, include=FALSE}
+# set global chunk options
+knitr::opts_chunk$set(
+	fig.align = "center",
+	fig.pos = "H",
+	message = FALSE,
+	warning = FALSE,
+	external = TRUE
+)
+```
+
+## Section 0
+### Functions
+```{r counts to status, message=FALSE, warning=FALSE, include=FALSE}
+df_conv = function(dataset, time_period){ 
+  df = dataset[, 1:9]
+  groups = dim(df)[1] / time_period
+  T1 = data.frame()
+  
+  for (i in 1:groups){  
+    subset = df[(time_period*(i-1)+1):(time_period*i), ]
+    t1 = data.frame()
+    t2 = data.frame()   
+    death_index = which(subset$Death != 0)
+    
+    if (length(death_index) != 0) {
+      rows1 = rep(death_index, subset$Death[death_index])
+      t1 = subset[rows1, -9]
+      t1$Death = 1
+    }    
+    deaths = sum(subset$Death)
+    total = subset$Death[1] + subset$Survival[1]
+    survivals = total - deaths
+    
+    if (survivals != 0){
+      rows2 = rep(time_period, survivals)
+      t2 = subset[rows2, -9]
+      t2$Death = 0
+    }
+    t = rbind(t1, t2)
+    T1 = rbind(T1, t)
+  }
+  cols_to_factor = c("Replicate","Population","Cage_Number")
+  T1 = T1 %>% mutate_at(cols_to_factor, funs(factor(.))) %>% 
+    mutate(Treatment = factor(Treatment, levels = c("Control","Fungal")),
+           Mating_status = factor(Mating_status, 
+                                  levels = c("Virgin","Virgin CO2","Mated","Cohabit")),
+           Sex = factor(Sex, levels = c("F", "M")))
+  return(T1)
+} 
+
+ci_calculator = function(tb){
+  a = data.frame(lower = as.numeric(), upper = as.numeric())
+  for (i in 1:max(tb$Day)+1) {
+    a[i,1] = quantile(tb$est[tb$Day == i-1], (1-bound)/2, na.rm = TRUE)
+    a[i,2] = quantile(tb$est[tb$Day == i-1], (1+bound)/2, na.rm = TRUE)
+  }
+  return(a)
+}
+
+assign_mt = function(row){
+  if(row["Mated"] == 1){a = "Mated"}
+  else if(row['Cohabit'] == 1){a = "Cohabit"}
+  else{a = "Virgin"}
+  return(a)
+}
+```
+
+### Import Data File
+```{r load data file, echo=FALSE}
+library(readxl)
+
+setwd("/Users/hanyin/Dropbox (CSU Fullerton)/Research Project/Flies/Kshama -- statistical analysis/SSMI mating")
+
+rep_12 = read_excel("data/Replicate 1 & 2 for R_SSMI.xlsx") 
+rep_3 = read_excel("data/SSMI_Rep3 for R.xlsx")
+rep_4 = read_excel("data/Replicate 4_R.xlsx")
+rep_5 = read_excel("data/Rep 5_for R.xlsx")
+```
+
+```{r apply df_conv( ), echo=FALSE, message=FALSE, warning=FALSE}
+library(kableExtra)
+library(tidyverse)
+library(reshape2)
+library(stringr)
+
+library(survival)
+library(survminer)
+
+rep_12 = rep_12 %>% select(-c(Eggs))
+names(rep_3) = names(rep_12); names(rep_4) = names(rep_12); names(rep_5) = names(rep_12)
+rep_12 = df_conv(rep_12, 20)
+rep_3 = df_conv(rep_3, 21)
+rep_4 = df_conv(rep_4, 21)
+rep_5 = df_conv(rep_5, 20)
+
+df = rbind(rep_12, rep_3, rep_4, rep_5)
+summary(df)
+
+# df %>% filter(Sex=="M",Treatment=="Fungal",
+#               Mating_status=="Mated") %>% nrow()
+```
+
+### Set Up Parameters
+```{r set up parameters, include=FALSE}
+B = 1000            # bootstrap iterations
+bound = 0.95         # confidence interval
+set_digits = 2       # digits in p-val table
+
+set_line_size = 0.8      # set line size 1.8
+set_point_size = 0.9      # set point size 2.1
+set_alpha = 0.7          # shaded region alpha
+set_err_size = 0.7       # set line size of errpr bar
+set_err_width = 0.7      # set width of error bar
+
+thm = theme(axis.line = element_line(color="gray54", size=0.1, linetype="solid"),
+            panel.background = element_rect(fill = NA),
+            legend.key = element_rect(fill = NA),
+            legend.background = element_rect(fill = NA),
+            plot.title = element_text(size = 15, hjust = 0.5)) 
+
+g = guides(linetype = guide_legend(order = 1), color = guide_legend(order = 2))
+```
+
+### Replicate Test
+```{r echo=FALSE, fig.height=2.5, fig.width=5}
+# level_mat = c("Virgin","Virgin CO2","Mated","Cohabit")
+# tb = df %>% mutate(Mating_status = factor(Mating_status, levels = level_mat),
+#                    Rep = Replicate)
+# fit = survfit(Surv(Day, Death) ~ Rep, data = tb)
+# ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+# pairwise_survdiff(Surv(Day, Death == 1) ~ Rep,
+#                   p.adjust.method = "holm", data = tb)
+df = df %>% filter(Replicate != 1)
+# df %>% filter(Sex=="M",Treatment=="Fungal",
+#               Mating_status=="Virgin") %>% nrow()
+# write_csv(df, "SSMI raw.csv")
+```
+
+\newpage
+## Section 1: Raw data
+### virgin & virgin co2
+```{r}
+# df %>% filter(Mating_status %in% c("Virgin", "Virgin CO2")) %>%
+#   mutate(sex = ifelse(Sex=="F", "female", "male"),
+#          tag = paste(Mating_status, sex)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+#   group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+#   mutate(surv_per = 100*(1-Death/total)) %>%
+#   ggplot(aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+#     geom_line(size = set_line_size) +
+#     geom_point(size = set_point_size) +
+#     scale_color_manual(
+#       values=c("Virgin female"="#32CD32", "Virgin CO2 female"="#006400",
+#                "Virgin male"="#FA8072", "Virgin CO2 male"="#BA251F")) +
+#     scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+#     labs(title = "Survival Percent of Control and Fungal", linetype="", color="",
+#          y = "Survival Percent (%)", color="Mating Status") +
+#     ylim(0,100) +
+#     thm + g
+```
+
+### overall
+```{r}
+df %>% filter(Mating_status != "Virgin CO2") %>%
+  mutate(sex = ifelse(Sex=="F", "female", "male"),
+         tag = paste(Mating_status, sex)) %>%
+  group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+  group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+  group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+  mutate(surv_per = 100*(1-Death/total)) %>% 
+  ggplot(aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+    geom_line(size = set_line_size) +
+    geom_point(size = set_point_size) +
+    scale_color_manual(
+      values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+               "Cohabit female"="#006400", "Virgin male"="#FA8072",
+               "Mated male"="#EE2C2C","Cohabit male"="#BA251F"),
+      breaks=c("Virgin male","Mated male","Cohabit male",
+               "Virgin female","Mated female","Cohabit female")) +
+    scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+    labs(title = "Survival Percent of Control and Fungal", linetype="", color="",
+         y = "Survival Percent (%)", color="Mating Status") +
+    ylim(0,100) +
+    thm + g
+```
+
+### all female
+```{r}
+# t = df %>% filter(Mating_status != "Virgin CO2", Sex=="F") %>% 
+#   mutate(sex = ifelse(Sex=="F", "female", "male"),
+#          tag = paste(Mating_status, sex)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+#   group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+#   mutate(surv_per = 100*(1-Death/total)) %>% as.data.frame() %>% 
+#   select(tag, Treatment, Day, surv_per)
+# initial = t %>% select(tag, Treatment) %>% unique() %>%
+#   mutate(Day = 0, surv_per = 100)
+# ggplot(rbind(initial,t), aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+#   geom_line(size = set_line_size) + 
+#   geom_point(size = set_point_size) + 
+#   scale_color_manual(
+#     values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+#                "Cohabit female"="#006400", "Virgin male"="#FA8072",
+#                "Mated male"="#EE2C2C","Cohabit male"="#BA251F"),
+#     breaks=c("Virgin male","Mated male","Cohabit male",
+#                "Virgin female","Mated female","Cohabit female")) +
+#   scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+#   labs(title = "Survival Percent of Control and Fungal Female", linetype="", color="",
+#          y = "Survival Percent (%)", color="Mating Status") +
+#   ylim(0,100) +
+#   thm + g
+```
+
+### all male
+```{r}
+# t = df %>% filter(Mating_status != "Virgin CO2", Sex=="M") %>% 
+#   mutate(sex = ifelse(Sex=="F", "female", "male"),
+#          tag = paste(Mating_status, sex)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+#   group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+#   mutate(surv_per = 100*(1-Death/total)) %>% as.data.frame() %>% 
+#   select(tag, Treatment, Day, surv_per)
+# initial = t %>% select(tag, Treatment) %>% unique() %>%
+#   mutate(Day = 0, surv_per = 100)
+# ggplot(rbind(initial,t), aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+#   geom_line(size = set_line_size) + 
+#   geom_point(size = set_point_size) + 
+#   scale_color_manual(
+#     values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+#                "Cohabit female"="#006400", "Virgin male"="#FA8072",
+#                "Mated male"="#EE2C2C","Cohabit male"="#BA251F"),
+#     breaks=c("Virgin male","Mated male","Cohabit male",
+#                "Virgin female","Mated female","Cohabit female")) +
+#   scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+#   labs(title = "Survival Percent of Control and Fungal Male", linetype="", color="",
+#          y = "Survival Percent (%)", color="Mating Status") +
+#   ylim(0,100) +
+#   thm + g
+```
+
+### virgin
+```{r}
+# t = df %>% filter(Mating_status == "Virgin") %>% 
+#   mutate(sex = ifelse(Sex=="F", "female", "male"),
+#          tag = paste(Mating_status, sex)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+#   group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+#   mutate(surv_per = 100*(1-Death/total)) %>% as.data.frame() %>% 
+#   select(tag, Treatment, Day, surv_per)
+# initial = t %>% select(tag, Treatment) %>% unique() %>%
+#   mutate(Day = 0, surv_per = 100)
+# ggplot(rbind(initial,t), aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+#   geom_line(size = set_line_size) + 
+#   geom_point(size = set_point_size) + 
+#   scale_color_manual(
+#     values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+#                "Cohabit female"="#006400", "Virgin male"="#FA8072",
+#                "Mated male"="#EE2C2C","Cohabit male"="#BA251F"),
+#     breaks=c("Virgin male","Mated male","Cohabit male",
+#                "Virgin female","Mated female","Cohabit female")) +
+#   scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+#   labs(title = "Survival Percent of Control and Fungal Virgin", linetype="", color="",
+#          y = "Survival Percent (%)", color="Mating Status") +
+#   ylim(0,100) +
+#   thm + g
+```
+
+### mated
+```{r}
+# t = df %>% filter(Mating_status == "Mated") %>% 
+#   mutate(sex = ifelse(Sex=="F", "female", "male"),
+#          tag = paste(Mating_status, sex)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+#   group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+#   mutate(surv_per = 100*(1-Death/total)) %>% as.data.frame() %>% 
+#   select(tag, Treatment, Day, surv_per)
+# initial = t %>% select(tag, Treatment) %>% unique() %>%
+#   mutate(Day = 0, surv_per = 100)
+# ggplot(rbind(initial,t), aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+#   geom_line(size = set_line_size) + 
+#   geom_point(size = set_point_size) + 
+#   scale_color_manual(
+#     values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+#                "Cohabit female"="#006400", "Virgin male"="#FA8072",
+#                "Mated male"="#EE2C2C","Cohabit male"="#BA251F"),
+#     breaks=c("Virgin male","Mated male","Cohabit male",
+#                "Virgin female","Mated female","Cohabit female")) +
+#   scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+#   labs(title = "Survival Percent of Control and Fungal Mated", linetype="", color="",
+#          y = "Survival Percent (%)", color="Mating Status") +
+#   ylim(0,100) +
+#   thm + g
+```
+
+### cohabit
+```{r}
+# t = df %>% filter(Mating_status == "Cohabit") %>% 
+#   mutate(sex = ifelse(Sex=="F", "female", "male"),
+#          tag = paste(Mating_status, sex)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+#   group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+#   group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+#   mutate(surv_per = 100*(1-Death/total)) %>% as.data.frame() %>% 
+#   select(tag, Treatment, Day, surv_per)
+# initial = t %>% select(tag, Treatment) %>% unique() %>%
+#   mutate(Day = 0, surv_per = 100)
+# ggplot(rbind(initial,t), aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+#   geom_line(size = set_line_size) + 
+#   geom_point(size = set_point_size) + 
+#   scale_color_manual(
+#     values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+#                "Cohabit female"="#006400", "Virgin male"="#FA8072",
+#                "Mated male"="#EE2C2C","Cohabit male"="#BA251F"),
+#     breaks=c("Virgin male","Mated male","Cohabit male",
+#                "Virgin female","Mated female","Cohabit female")) +
+#   scale_linetype_manual(values = c("dotted", "solid"), labels = c("Control", "Fungal")) +
+#   labs(title = "Survival Percent of Control and Fungal Cohabit", linetype="", color="",
+#          y = "Survival Percent (%)", color="Mating Status") +
+#   ylim(0,100) +
+#   thm + g
+```
+
+
+
+\newpage
+## Section 4: no CO2 analysis
+
+### step 1: test proportionality assumption
+```{r echo=FALSE}
+l = c("Virgin", "Mated", "Cohabit")
+tb1 = df %>% filter(Mating_status != "Virgin CO2") %>% 
+  mutate(Mating_status = factor(Mating_status, levels = l),
+         Fungal = (Treatment=="Fungal")+0, Male = (Sex=="M")+0,
+         Mated = (Mating_status=="Mated")+0, Cohabit = (Mating_status=="Cohabit")+0)
+mod = coxph(Surv(Day, Death) ~ Treatment + Male + Mating_status, data = tb1)
+cox.zph(mod)
+cox.zph(mod, transform=log)
+```
+
+```{r}
+# log cumulative hazard
+# Infected: not parallel
+# mod = coxph(Surv(Day, Death) ~ strata(Treatment) + Sex + Mating_status, data = tb1)
+# plot(survfit(mod), fun="cloglog", lty=1:2,
+#      xlab="Log of Time",
+#      ylab="Log-Cumulative Hazard Function")
+# legend("bottomright", legend=c("Uninfected", "Infected"), 
+#        bty="n",cex=1,lty=1:2)
+# # sex
+# mod = coxph(Surv(Day, Death) ~ Treatment + strata(Sex) + Mating_status, data = tb1)
+# plot(survfit(mod), fun="cloglog", lty=1:2,
+#      xlab="Log of Time",
+#      ylab="Log-Cumulative Hazard Function")
+# legend("bottomright",legend=c("Female", "Male"), bty="n",cex=1,lty=1:2)
+# # mating status
+# mod = coxph(Surv(Day, Death) ~ Treatment + Sex + strata(Mating_status), data = tb1)
+# plot(survfit(mod), fun="cloglog", lty=1:3,
+#      xlab="Log of Time",
+#      ylab="Log-Cumulative Hazard Function")
+# legend("bottomright",lty=1:3, legend=c("Virgin","Mated","Cohabit"), 
+#        bty="n", cex=1)
+# 
+# mod = coxph(Surv(Day, Death) ~ Fungal + Male + Mated + Cohabit, data = tb1)
+# cox.zph(mod)
+# cox.zph(mod, transform=log)
+# sresids <- residuals(mod, type="scaledsch")
+# colnames(sresids) <- names(mod$coef)
+# time = as.numeric( rownames( sresids ) )
+# 
+# plot(time, sresids[,1], xlab="Time", 
+#      ylab="Scaled SR (Fungal)")
+# lines(smooth.spline(time, sresids[,1]), col="red", lwd=2)
+# lines(smooth.spline(time, sresids[,1], df=2), col="blue",lwd=2,lty=2)
+# lines(smooth.spline(time, sresids[,1], df=3), col="green",lwd=2,lty=2)
+# lm(sresids[,1]~time) %>% summary()
+# plot(time, sresids[,2], xlab="Time", 
+#      ylab="Scaled SR (Male)" )
+# lines(smooth.spline( time, sresids[,2]), col="red", lwd=2)
+# lines(smooth.spline(time, sresids[,2], df=2), col="blue",lwd=2,lty=2)
+# lines(smooth.spline(time, sresids[,2], df=3), col="green",lwd=2,lty=2)
+# lm(sresids[,2]~time) %>% summary()
+# plot(time, sresids[,3], xlab="Time", 
+#      ylab="Scaled SR (Mated)" )
+# lines(smooth.spline(time, sresids[,3]), col="red", lwd=2)
+# lines(smooth.spline(time, sresids[,3], df=2), col="blue",lwd=2,lty=2)
+# lines(smooth.spline(time, sresids[,3], df=3), col="green",lwd=2,lty=2)
+# lm(sresids[,3]~time) %>% summary()
+# plot(time, sresids[,4], xlab="Time", 
+#      ylab="Scaled SR (Cohabit)" )
+# lines(smooth.spline(time, sresids[,4]), col="red", lwd=2)
+# lines(smooth.spline(time, sresids[,4], df=2), col="blue",lwd=2,lty=2)
+# lines(smooth.spline(time, sresids[,4], df=3), col="green",lwd=2,lty=2)
+# lm(sresids[,4]~time) %>% summary()
+```
+
+### step 2: stratify the model
+```{r echo=FALSE, fig.height=4, fig.width=5}
+# fungal
+# mod = coxph(Surv(Day, Death) ~ strata(Treatment) + Sex + Mating_status, data = tb1)
+# pred = survfit(mod)
+# plot(pred, lty = 1:2, col = c("red","blue"))
+# legend("bottomleft", legend = c("Control","Fungal"), 
+#        lty = 1:2, col = c("red","blue"), cex=0.9)
+# 
+# mod = coxph(Surv(Day, Death) ~ Treatment + Sex + strata(Mating_status), data = tb1)
+# pred = survfit(mod)
+# plot(pred, lty = 1:3, col = c("red","blue","green"))
+# legend("bottomleft", legend = c("Virgin","Mated","Cohabit"), 
+#        lty = 1:3, col = c("red","blue","green"), cex=0.9)
+```
+
+
+### step 3: split at Day 6
+```{r echo=FALSE}
+# a1 = 5
+# split_time = a1
+# tb2 = survSplit(tb1, cut=split_time, end="Day", event="Death", start="Start") %>%
+#   mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, Fungal = (Treatment=="Fungal")+0,
+#          Mated = (Mating_status=="Mated")+0, Cohabit = (Mating_status=="Cohabit")+0)
+# mod = coxph(Surv(Start, Day, Death) ~ Fungal:gt1 + Fungal:gt2 +
+#               Mated:Fungal + Male + Mated:Fungal:Male +
+#               Cohabit + Cohabit:Fungal:Male, data = tb2)
+# cox.zph(mod)
+# cox.zph(mod, transform = log)
+# summary(mod)
+# extractAIC(mod)
+# 
+# a1 = 5; a2 = 11
+# split_time = c(a1,a2)
+# tb2 = survSplit(tb1, cut=split_time, end="Day", event="Death", start="Start") %>%
+#   mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+#          Fungal = (Treatment=="Fungal")+0, Mated = (Mating_status=="Mated")+0,
+#          Cohabit = (Mating_status=="Cohabit")+0)
+# mod = coxph(Surv(Start, Day, Death) ~ Fungal:gt1 + Fungal:gt2 + Fungal:gt3 +
+#               Mated:Fungal + Male + Mated:Fungal:Male + 
+#               Cohabit:gt1 + Cohabit:gt2 + Cohabit:gt3, data = tb2)
+# cox.zph(mod)
+# cox.zph(mod, transform = log)
+# summary(mod)
+# extractAIC(mod)
+```
+
+### step 4: split at Day 6 and Day 12
+```{r echo=FALSE}
+a1 = 6; a2 = 12
+split_time = c(a1, a2)
+tb1$id = c(1:nrow(tb1))
+tb2 = survSplit(tb1, cut=split_time, end="Day", event="Death", start="Start") %>% 
+  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+         Fungal = (Treatment=="Fungal")+0, Male = (Sex=="M")+0,
+         Mated = (Mating_status=="Mated")+0, Cohabit = (Mating_status=="Cohabit")+0)
+
+# fungal only
+mod = coxph(Surv(Start, Day, Death) ~ Fungal:gt1 + Fungal:gt2 + Fungal:gt3 + 
+              Mating_status + Sex, data = tb2)
+cox.zph(mod, transform=log)
+
+# both fungal and mating_status
+mod = coxph(Surv(Start, Day, Death) ~ Fungal:gt1 + Fungal:gt2 + Fungal:gt3 + 
+              Mated:gt1 + Mated:gt2 + Mated:gt3 + 
+              Cohabit:gt1 + Cohabit:gt2 + Cohabit:gt3 + 
+              Sex, data = tb2)
+cox.zph(mod)
+cox.zph(mod, transform=log)
+summary(mod)
+extractAIC(mod)
+```
+
+```{r}
+a1 = 6; a2 = 12
+split_time = c(a1, a2)
+tb1$id = c(1:nrow(tb1))
+tb2 = survSplit(tb1, cut=split_time, end="Day", event="Death", start="Start") %>% 
+  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+         Fungal = (Treatment=="Fungal")+0, Male = (Sex=="M")+0,
+         Mated = (Mating_status=="Mated")+0, Cohabit = (Mating_status=="Cohabit")+0)
+mod = coxph(Surv(Start, Day, Death) ~ Fungal:gt1 + Fungal:gt2 + Fungal:gt3 +
+              Mated:gt1 + Mated:gt2 + Mated:gt3 + 
+              Cohabit:gt1 + Cohabit:gt2 + Cohabit:gt3 + 
+              Male + Fungal:Male + Mated:Male + Fungal:Mated, data = tb2)
+summary(mod)
+cox.zph(mod)
+extractAIC(mod)
+```
+
+```{r}
+# dresids <- residuals(mod, type="deviance")
+# lp <- predict(mod, type="lp")
+# plot(lp, dresids, xlab="Linear Predictor", ylab="Deviance Residual")
+# abline(h=c(-2.5,2.5), col="blue", lty=2)
+# 
+# cbind(tb2[,c("id","Treatment","Sex","Mating_status")], 
+#       dresids)[abs(dresids)>= 2.5,]
+# 
+# dfbeta <- residuals(mod, type="dfbeta")
+# colnames(dfbeta) <- names(mod$coef)
+# summary( dfbeta )
+# plot(tb2$id, dfbeta[,1], xlab="Index", ylab="log(fungal_1) delta-beta" )
+# plot(tb2$id, dfbeta[,2], xlab="Index", ylab="log(fungal_2) delta-beta" )
+# plot(tb2$id, dfbeta[,3], xlab="Index", ylab="log(fungal_3) delta-beta" )
+# plot(tb2$id, dfbeta[,4], xlab="Index", ylab="log(mated_1) delta-beta" )
+# plot(tb2$id, dfbeta[,5], xlab="Index", ylab="log(mated_2) delta-beta" )
+# plot(tb2$id, dfbeta[,6], xlab="Index", ylab="log(mated_3) delta-beta" )
+# plot(tb2$id, dfbeta[,7], xlab="Index", ylab="log(cohabit_1) delta-beta" )
+# plot(tb2$id, dfbeta[,8], xlab="Index", ylab="log(cohabit_2) delta-beta" )
+# plot(tb2$id, dfbeta[,9], xlab="Index", ylab="log(cohabit_3) delta-beta" )
+# plot(tb2$id, dfbeta[,10], xlab="Index", ylab="log(male) delta-beta" )
+# plot(tb2$id, dfbeta[,11], xlab="Index", ylab="log(fungal_male) delta-beta" )
+# plot(tb2$id, dfbeta[,12], xlab="Index", ylab="log(mated_male) delta-beta" )
+# 
+# cols_to_take = c("id","Replicate","Treatment","Mating_status","Sex","Day","Death")
+# tb2[dfbeta[,7] < -.015, ] %>% select(cols_to_take)
+# tb2[dfbeta[,10] < -.03, ] %>% select(cols_to_take)
+```
+
+
+```{r echo=FALSE}
+int_eff = function(tb){
+  tb = survSplit(tb, cut=split_time, end="Day", event="Death", start="Start") %>%
+  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+         Fungal = (Treatment=="Fungal")+0, Male = (Sex=="M")+0,
+         Mated=(Mating_status=="Mated")+0, Cohabit=(Mating_status=="Cohabit")+0,
+         t1_fun = Fungal*gt1, t2_fun = Fungal*gt2, t3_fun = Fungal*gt3,
+         t1_mat = Mated*gt1, t2_mat = Mated*gt2, t3_mat = Mated*gt3,
+         t1_coh = Cohabit*gt1, t2_coh = Cohabit*gt2, t3_coh = Cohabit*gt3, 
+         male_fun = Male*Fungal, male_mat = Male*Mated, fun_mated=Fungal*Mated)
+  return(tb)
+}
+tb2 = int_eff(tb1)
+mod = coxph(Surv(Start, Day, Death) ~ Fungal + t1_fun + t2_fun +
+              Mated + t1_mat + t2_mat + Cohabit + t1_coh + t2_coh + 
+              Male + male_fun + male_mat + fun_mated, data = tb2)
+```
+
+```{r}
+# mod = coxph(Surv(Start, Day, Death) ~ t1_fun + t2_fun + t3_fun +
+#               t1_mat + t2_mat + t3_mat + t1_coh + t2_coh + t3_coh +
+#               Male + male_fun + male_mat + fun_mated, data = tb2)
+# beta = coef(mod)
+# # diff = c(0,0,0, 0,0,0, 0,0,0, 0,0,0) - c(1,1,1, 0,0,0, 0,0,0, 1,1,0)
+# diff = c(0,0,0, 0,0,0, 0,0,0, 1,1,0,0)
+# t_obs = (beta%*%diff) / sqrt(t(diff) %*% vcov(mod) %*% diff)
+# 2*(1-pt(abs(t_obs), length(beta)))
+```
+
+
+
+```{r echo=FALSE, warning=FALSE}
+cat = tb2 %>% select(Fungal, Mated, Cohabit, Male, male_fun, male_mat, fun_mated) %>% unique()
+time_intervals = data.frame(Start = c(0, a1, a2), Day = c(a1, a2, 21),
+                            gt1 = c(1,0,0), gt2 = c(0,1,0),
+                            Death = 0)
+assign_mt = function(row){
+  if(row["Mated"] == 1){a = "Mated"}
+  else if(row['Cohabit'] == 1){a = "Cohabit"}
+  else{a = "Virgin"}
+  return(a)
+}
+pred_surv = function(tb){
+  mod = coxph(Surv(Start, Day, Death) ~ Fungal + t1_fun + t2_fun + 
+                Mated + t1_mat + t2_mat + Cohabit + t1_coh + t2_coh + 
+                Male + male_fun + male_mat + fun_mated, data = int_eff(tb))
+  surv = c()
+  for (i in 1:nrow(cat)){
+    test = data.frame(cat[i,], time_intervals, row.names = NULL) %>%
+      mutate(t1_fun = Fungal*gt1, t2_fun = Fungal*gt2,
+             t1_mat = Mated*gt1, t2_mat = Mated*gt2,
+             t1_coh = Cohabit*gt1, t2_coh = Cohabit*gt2,
+             male_fun = Male*Fungal, male_mat = Male*Mated, fun_mated=Fungal*Mated)
+    time = summary(survfit(mod, newdata = test, individual = TRUE))$time
+    insert = setdiff(1:21, time)
+    time = c(time, insert)
+    est = c(1, summary(survfit(mod, newdata = test, individual = TRUE))$surv,
+            rep(NA, length(insert)))
+    surv_i = data.frame(cat[i,], est, day = c(0,time)) %>% arrange(day)
+    surv = rbind(surv, surv_i)
+  }
+  surv = surv %>% mutate(Treatment = ifelse(Fungal==1, "Fungal", "Control"),
+                         Sex = ifelse(Male==1, "male", "female")) %>% 
+    select(-c(male_fun, male_mat, fun_mated))
+  surv$Mating_status = apply(surv, 1, function(x) assign_mt(x))
+  return(surv)
+}
+
+est = pred_surv(tb1)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ci_calculator = function(tb){
+  a = data.frame(lower = as.numeric(), upper = as.numeric())
+  for (i in 1:max(tb$Day)+1) {
+    a[i,1] = quantile(tb$est[tb$Day == i-1], (1-bound)/2, na.rm = TRUE)
+    a[i,2] = quantile(tb$est[tb$Day == i-1], (1+bound)/2, na.rm = TRUE)
+  }
+  return(a)
+}
+
+dummy = c()
+for (i in 1:B){
+  dummy_i = c()
+  for (j in 1:nrow(cat)){
+    dummy_ij = merge(tb1, cat[j,])
+    a = nrow(dummy_ij)
+    rows_to_take = sample(a, a, replace = TRUE)
+    dummy_i = rbind(dummy_i, dummy_ij[rows_to_take,])
+    }
+  dummy_i = pred_surv(dummy_i)
+  dummy = rbind(dummy, dummy_i)
+}
+
+survs = c()
+for (i in 1:nrow(cat)){
+  ci = merge(dummy, cat[i,]) %>% mutate(Day=day) %>% ci_calculator()
+  surv = merge(est, cat[i,]) %>% arrange(day)
+  surv = cbind(surv, ci)
+  survs = rbind(survs, surv)
+}
+
+survs = survs %>% mutate(Day = day, int_colour = paste(Mating_status, Sex))
+# write.csv(survs, file = "Surv bootstrap 1000.csv")
+```
+
+### plot: all together
+```{r}
+set_label = c("Virgin female (n=425)","Mated female (n=426)","Cohabit female (n=435)",
+              "Virgin male (n=411)","Mated male (n=427)","Cohabit male (n=453)")
+set_order = c("Virgin female","Mated female","Cohabit female",
+              "Virgin male","Mated male","Cohabit male")
+
+plot_tb = survs %>% mutate(int_colour = paste(Mating_status, Sex))
+
+
+plot_tb %>% 
+  mutate(Mating_status = recode(Mating_status, 
+                                "Virgin"="(B) Virgin",
+                                "Cohabit"="(A) Cohabiting",
+                                "Mated"="(C) Mated"),
+         Mating_status = factor(Mating_status, 
+                                levels=c("(A) Cohabiting",
+                                         "(B) Virgin",
+                                         "(C) Mated"))) %>% 
+  ggplot(aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment), size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = 0.5) +
+  scale_colour_manual(name="", breaks=set_order, labels=set_label,
+                      values=c("#006400","#BA251F", "#64B39B",
+                               "#EE2C2C","#32CD32","#FA8072")) +
+  scale_linetype_manual(name="",values=c("dashed", "solid"),
+                        labels=c("Control (n=1273)", "Fungal (n=1304)")) +
+  labs(x="Days after spray", y="Survival Probability", 
+       title="") +
+  thm + ylim(0,1) + g +
+  facet_wrap(~Mating_status)
+
+
+# ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+#                     colour = int_colour)) + 
+#   geom_line(aes(linetype = Treatment), size = set_line_size) + 
+#   geom_point(size = set_point_size) +
+#   scale_colour_manual(name="", breaks=set_order, labels=set_label,
+#                       values=c("#006400","#BA251F", "#64B39B",
+#                                "#EE2C2C","#32CD32","#FA8072")) +
+#   scale_linetype_manual(name="",values=c("dotted", "solid"),
+#                         labels=c("Control (n=1273)", "Fungal (n=1304)")) +
+#   labs(x="Days", y="Survival Probability", 
+#        title="Survival Probability of Control and Fungal") +
+#   thm + ylim(0,1) + g
+```
+
+
+### plot: female
+```{r}
+set_label = c("Control Virgin (n=205)","Control Mated (n=210)",
+              "Control Cohabit (n=221)",
+              "Fungal Virgin (n=220)","Fungal Mated (n=216)",
+              "Fungal Cohabit (n=214)")
+set_order = c("Control Virgin","Control Mated","Control Cohabit",
+              "Fungal Virgin", "Fungal Mated", "Fungal Cohabit")
+plot_tb = survs %>% filter(Sex=="female") %>% 
+  mutate(int_colour = paste(Treatment,Mating_status))
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour, linetype = int_colour)) + 
+  geom_line(size = set_line_size) + geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#006400","#64B39B","#32CD32",
+                                       "#006400","#64B39B","#32CD32"), 
+                      breaks = set_order, labels = set_label) +
+  scale_linetype_manual(name="",values=c("dotted","dotted","dotted",
+                                         "solid","solid","solid"),
+                        labels=set_label) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Female") +
+  thm + ylim(0,1)
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = Mating_status)) + 
+  geom_line(aes(linetype = Treatment), size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="", values=c("#006400","#64B39B","#32CD32"), 
+                      breaks = c("Virgin","Mated","Cohabit")) +
+  scale_linetype_manual(name="", values=c("dotted","solid"),
+                        labels = c("Control (n=636)","Fungal (n=650)")) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Female") +
+  thm + ylim(0,1) + g
+```
+
+
+### plot: male
+```{r}
+set_label = c("Control Virgin (n=199)","Control Mated (n=219)",
+              "Control Cohabit (n=219)",
+              "Fungal Virgin (n=212)","Fungal Mated (n=208)",
+              "Fungal Cohabit (n=234)")
+
+plot_tb = survs %>% filter(Sex=="male") %>% 
+  mutate(int_colour = paste(Treatment,Mating_status))
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour, linetype = int_colour)) + 
+  geom_line(size = set_line_size) + geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#BA251F","#EE2C2C","#FA8072",
+                                       "#BA251F","#EE2C2C","#FA8072"), 
+                      breaks = set_order, labels = set_label) +
+  scale_linetype_manual(name="",values=c("dotted","dotted","dotted",
+                                         "solid","solid","solid"),
+                        labels=set_label) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Male") +
+  thm + ylim(0,1)
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = Mating_status)) + 
+  geom_line(aes(linetype = Treatment), size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="", values=c("#BA251F","#EE2C2C","#FA8072"), 
+                      breaks = c("Virgin","Mated","Cohabit")) +
+  scale_linetype_manual(name="", values=c("dotted","solid"),
+                        labels = c("Control (n=637)","Fungal (n=654)")) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Male") +
+  thm + ylim(0,1) + g
+```
+
+### plot: virgin
+```{r}
+set_label = c("Control Female (n=205)","Fungal Female (n=220)",
+              "Control Male (n=199)","Fungal Male (n=212)")
+plot_tb = survs %>% filter(Mating_status=="Virgin")
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper, 
+           colour = interaction(Treatment,Sex), 
+           linetype = interaction(Treatment,Sex))) + 
+  geom_line(size = set_line_size) + geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#32CD32","#32CD32","#FA8072","#FA8072"), 
+                      labels=set_label) +
+  scale_linetype_manual(name="",values=c("dotted", "solid","dotted","solid"),
+                        labels=set_label) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Virgin") +
+  thm + ylim(0,1)
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment),size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#32CD32","#FA8072")) +
+  scale_linetype_manual(name="",values=c("dotted","solid"),
+                        labels = c("Control (n=404)", "Fungal (n=432)")) +
+  labs(x="Days", y="Survival Probability", colour="", linetype="",
+       title="Survival Probability of Control and Fungal Virgin") +
+  thm + g + ylim(0,1)
+```
+
+### plot: mated
+```{r}
+set_label = c("Control Female (n=210)","Fungal Female (n=216)",
+              "Control Male (n=219)","Fungal Male (n=208)")
+plot_tb = survs %>% filter(Mating_status=="Mated")
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper, 
+           colour = interaction(Treatment, Mating_status, Sex), 
+           linetype = interaction(Treatment, Mating_status,Sex))) + 
+  geom_line(size = set_line_size) + geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#64B39B","#64B39B","#EE2C2C","#EE2C2C"), 
+                      labels=set_label) +
+  scale_linetype_manual(name="",values=c("dotted", "solid","dotted","solid"),
+                        labels=set_label) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Mated") +
+  thm + ylim(0,1)
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment),size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#64B39B","#EE2C2C")) +
+  scale_linetype_manual(name="",values=c("dotted","solid"),
+                        labels = c("Control (n=429)", "fungal (n=424)")) +
+  labs(x="Days", y="Survival Probability", colour="", linetype="",
+       title="Survival Probability of Control and Fungal Mated") +
+  thm + g + ylim(0,1)
+```
+
+### plot: cohabit
+```{r}
+set_label = c("Control Female (n=221)","Fungal Female (n=214)",
+              "Control Male (n=219)","Fungal Male (n=234)")
+plot_tb = survs %>% filter(Mating_status=="Cohabit")
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper, 
+           colour = interaction(Treatment, Mating_status, Sex),
+           linetype = interaction(Treatment, Mating_status,Sex))) + 
+  geom_line(size = set_line_size) + geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#006400","#006400","#BA251F","#BA251F"), 
+                      labels=set_label) +
+  scale_linetype_manual(name="",values=c("dotted", "solid","dotted","solid"),
+                        labels=set_label) +
+  labs(x="Days", y="Survival Probability", 
+       title="Survival Probability of Control and Fungal Cohabit") +
+  thm + ylim(0,1)
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment),size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="",values=c("#006400","#BA251F")) +
+  scale_linetype_manual(name="",values=c("dotted","solid"),
+                        labels = c("Control (n=440)", "fungal (n=448)")) +
+  labs(x="Days", y="Survival Probability", colour="", linetype="",
+       title="Survival Probability of Control and Fungal Cohabit") +
+  thm + g + ylim(0,1)
+```
+
+
+\newpage
+## Section 3: CO2 Analysis
+```{r}
+level_mat = c("Virgin", "Virgin CO2")
+tb = df %>% filter(Mating_status %in% level_mat) %>%
+  mutate(Fungal = (Treatment=="Fungal") + 0,
+         Male = (Sex == "M") + 0,
+         CO2 = (Mating_status == "Virgin CO2") + 0)
+```
+
+### step 1: replicate test
+```{r}
+# test replicates
+# tb_i = tb %>% filter(Mating_status == "Virgin CO2", Sex=="M")
+# fit = survfit(Surv(Day, Death) ~ Replicate, data = tb_i)
+# ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+# pairwise_survdiff(Surv(Day, Death == 1) ~ Replicate,
+#                   p.adjust.method = "holm", data = tb_i)
+```
+
+```{r fig.height=2.5, fig.width=5}
+# CO2 single effect
+tb1_f = tb %>% filter(Fungal == 1)
+fit = survfit(Surv(Day, Death) ~ CO2, data = tb1_f)
+ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+```
+
+```{r fig.height=2.5, fig.width=5}
+# CO2 effect on fungal males
+tb1_f_m = tb1_f %>% filter(Male == 1)
+fit = survfit(Surv(Day, Death) ~ CO2, data = tb1_f_m)
+ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+```
+
+```{r fig.height=2.5, fig.width=5}
+# CO2 effect on fungal females
+tb1_f_f = tb1_f %>% filter(Male == 0)
+fit = survfit(Surv(Day, Death) ~ CO2, data = tb1_f_f)
+ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+```
+
+### step 2: split at Day 6
+```{r}
+a1 = 6
+split_time = a1
+tb$id = c(1:nrow(tb))
+tb2 = survSplit(tb, cut=split_time, end="Day", event="Death", start="Start") %>% 
+  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0,
+         Fungal = (Treatment=="Fungal")+0, Male = (Sex=="M")+0,
+         CO2 = (Mating_status=="Virgin CO2")+0)
+mod = coxph(Surv(Start, Day, Death) ~ Fungal:gt1 + Fungal:gt2 +
+              Male + Male:CO2, data = tb2)
+summary(mod)
+cox.zph(mod)
+extractAIC(mod)
+```
+
+```{r echo=FALSE}
+int_eff = function(tb){
+  tb = survSplit(tb, cut=split_time, end="Day", event="Death", start="Start") %>%
+    mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0,
+           t1_fun = Fungal*gt1, t2_fun = Fungal*gt2,
+           Fungal = (Treatment=="Fungal")+0, Male = (Sex=="M")+0,
+           CO2 = (Mating_status=="Virgin CO2")+0,
+           male_co2 = Male*CO2)
+  return(tb)
+}
+tb2 = int_eff(tb)
+mod = coxph(Surv(Start, Day, Death) ~ t1_fun + t2_fun + Male + male_co2, data = tb2)
+``` 
+
+```{r}
+diff = c(0,0, 1,1) - c(0,0, 1,0)
+beta = coef(mod)
+t_obs = (beta%*%diff) / sqrt(t(diff) %*% vcov(mod) %*% diff)
+c(exp(diff %*% beta), 2*(1-pt(abs(t_obs), length(beta)))) #beta, pval
+```
+
+```{r echo=FALSE, warning=FALSE}
+cat = tb2 %>% select(Fungal, CO2, Male, male_co2) %>% unique()
+time_intervals = data.frame(Start = c(0, a1), Day = c(a1, 21),
+                            gt1 = c(1,0), gt2 = c(0,1), Death = 0)
+assign_mt = function(row){
+  if(row["Mated"] == 1){a = "Mated"}
+  else if(row['Cohabit'] == 1){a = "Cohabit"}
+  else{a = "Virgin"}
+  return(a)
+}
+pred_surv = function(tb){
+  mod = coxph(Surv(Start, Day, Death) ~ t1_fun + t2_fun + Male + male_co2, 
+              data = int_eff(tb))
+  surv = c()
+  for (i in 1:nrow(cat)){
+    test = data.frame(cat[i,], time_intervals, row.names = NULL) %>%
+      mutate(t1_fun = Fungal*gt1, t2_fun = Fungal*gt2,
+             male_co2 = Male*CO2)
+    time = summary(survfit(mod, newdata = test, individual = TRUE))$time
+    insert = setdiff(1:21, time)
+    time = c(time, insert)
+    est = c(1, summary(survfit(mod, newdata = test, individual = TRUE))$surv,
+            rep(NA, length(insert)))
+    surv_i = data.frame(cat[i,], est, day = c(0,time)) %>% arrange(day)
+    surv = rbind(surv, surv_i)
+  }
+  surv = surv %>% mutate(Treatment = ifelse(Fungal==1, "Fungal", "Control"),
+                         Sex = ifelse(Male==1, "male", "female"),
+                         Mating_status = ifelse(CO2==1, "Virgin CO2", "Virgin")) %>% 
+    select(-c(male_co2))
+  return(surv)
+}
+
+est = pred_surv(tb)
+```
+
+### bootstrap
+```{r}
+B=5
+dummy = c()
+for (i in 1:B){
+  dummy_i = c()
+  for (j in 1:nrow(cat)){
+    dummy_ij = merge(tb, cat[j,])
+    a = nrow(dummy_ij)
+    rows_to_take = sample(a, a, replace = TRUE)
+    dummy_i = rbind(dummy_i, dummy_ij[rows_to_take,])
+    }
+  dummy_i = pred_surv(dummy_i)
+  dummy = rbind(dummy, dummy_i)
+}
+
+survs = c()
+for (i in 1:nrow(cat)){
+  ci = merge(dummy, cat[i,]) %>% mutate(Day=day) %>% ci_calculator()
+  surv = merge(est, cat[i,]) %>% arrange(day)
+  surv = cbind(surv, ci)
+  survs = rbind(survs, surv)
+}
+
+survs = survs %>% mutate(Day = day, int_colour = paste(Mating_status, Sex))
+```
+
+
+### plot 
+```{r fig.height=3, fig.width=6}
+set_label = c("Control Female (n=221)","Fungal Female (n=214)",
+              "Control Male (n=219)","Fungal Male (n=234)")
+plot_tb = survs
+
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment),size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="", 
+                      values=c("Virgin female"="#32CD32", "Virgin CO2 female"="#006400",
+                               "Virgin male"="#FA8072", "Virgin CO2 male"="#BA251F")) +
+  scale_linetype_manual(name="",values=c("dotted","solid"),
+                        labels = c("Control", "fungal")) +
+  labs(x="Days", y="Survival Probability", colour="", linetype="",
+       title="Survival Probability of Control and Fungal Virgin and Virgin CO2") +
+  thm + g + ylim(0,1) + theme(plot.subtitle = element_text(vjust = 1), 
+    plot.caption = element_text(vjust = 1), 
+    plot.title = element_text(size = 14)) +labs(colour = NULL, linetype = NULL)
+```
+
+```{r fig.height=3, fig.width=7}
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment),size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="", 
+                      values=c("Virgin female"="#32CD32", "Virgin CO2 female"="#006400",
+                               "Virgin male"="#FA8072", "Virgin CO2 male"="#BA251F")) +
+  scale_linetype_manual(name="",values=c("dotted","solid"),
+                        labels = c("Control", "fungal")) +
+  labs(x="Days", y="Survival Probability", colour="", linetype="",
+       title="Survival Probability of Control and Fungal Virgin and Virgin CO2") +
+  thm + g + ylim(0,1) + facet_wrap(~Sex)
+```
+
+```{r fig.height=3, fig.width=7}
+ggplot(plot_tb, aes(x=Day, y=est, ymin=lower, ymax=upper,
+                    colour = int_colour)) + 
+  geom_line(aes(linetype = Treatment),size = set_line_size) + 
+  geom_point(size = set_point_size) +
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  scale_colour_manual(name="", 
+                      values=c("Virgin female"="#32CD32", "Virgin CO2 female"="#006400",
+                               "Virgin male"="#FA8072", "Virgin CO2 male"="#BA251F")) +
+  scale_linetype_manual(name="",values=c("dotted","solid"),
+                        labels = c("Control", "fungal")) +
+  labs(x="Days", y="Survival Probability", colour="", linetype="",
+       title="Survival Probability of Control and Fungal Virgin and Virgin CO2") +
+  thm + g + ylim(0,1) + facet_wrap(~Mating_status)
+```
+
+
+
+
+
+
