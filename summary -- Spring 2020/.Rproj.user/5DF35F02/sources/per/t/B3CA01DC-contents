@@ -7,43 +7,200 @@ library(ggsci)
 
 source("Figure R code/R functions.R")
 
-### --------------------------    F1    --------------------------  
+####  --------------------------    F1    --------------------------  #####
 
-set_label = c("Virgin female (n=425)","Mated female (n=426)","Cohabiting female (n=435)",
-              "Virgin male (n=411)","Mated male (n=427)","Cohabiting male (n=453)")
-set_order = c("Virgin female","Mated female","Cohabiting female",
-              "Virgin male","Mated male","Cohabiting male")
+set_breaks <- 
+  c("Control virgin female","Control mated female","Control cohabiting female",
+    "Inocaluated virgin female","Inocaluated mated female","Inocaluated cohabiting female",
+    "Control virgin male","Control mated male","Control cohabiting male",
+    "Inocaluated virgin male","Inocaluated mated male","Inocaluated cohabiting male")
+
+set_labels <- 
+  c("Control virgin female (n=265)",
+    "Control mated female (n=270)",
+    "Control cohabiting female (n=280)",
+    "Inocaluated virgin female (n=280)",
+    "Inocaluated mated female (n=276)",
+    "Inocaluated cohabiting female (n=271)",
+    "Control virgin male (n=257)",
+    "Control mated male (n=277)",
+    "Control cohabiting male (n=277)",
+    "Inocaluated virgin male (n=272)",
+    "Inocaluated mated male (n=265)",
+    "Inocaluated cohabiting male (n=294)")
 
 read.csv("data/SSMI bootstrap.csv") %>% 
-  mutate(int_colour = paste(Mating_status, Sex)) %>% 
-  mutate(Mating_status = recode(Mating_status, 
-                                "Virgin"="(B) Virgin",
-                                "Cohabiting"="(A) Cohabiting",
-                                "Mated"="(C) Mated"),
-         Mating_status = factor(Mating_status, 
-                                levels=c("(A) Cohabiting",
-                                         "(B) Virgin",
-                                         "(C) Mated"))) %>% 
-  ggplot(aes(x=Day, y=est, ymin=lower, ymax=upper,
-             colour = int_colour)) + 
-  geom_line(aes(linetype = Treatment), size = 0.9) + 
+  mutate(int_colour = paste(Mating_status, Sex) %>% tolower(),
+         tag = paste(Treatment, int_colour)) %>% 
+  mutate(Sex = recode(Sex, "female" = "Female", "male" = "Male")) %>% 
+  ggplot(aes(x = Day, y = est, ymin = lower, ymax = upper,
+             linetype = tag, 
+             colour = tag)) + 
+  geom_line(size = 0.9) + 
   geom_point(size = 1) +
-  geom_errorbar(size = 0.7, width = 0.7, alpha = 0.5) +
-  scale_colour_manual(name="", breaks=set_order, labels=set_label,
-                      values=c("#32CD32","#64B39B","#006400",
-                               "#FA8072","#EE2C2C","#BA251F")) +
-  scale_linetype_manual(name="",values=c("dashed", "solid"),
-                        labels=c("Control (n=1273)", "Inoculated (n=1304)")) +
-  labs(x="Days after spray", y="Survival Probability", 
-       title="") +
-  thm + ylim(0,1) + g +
-  # facet_wrap(~Mating_status) +
+  scale_colour_manual(
+    values = c(
+      "Control virgin female" = "#32CD32",
+      "Control mated female" = "#64B39B",
+      "Control cohabiting female" = "#006400",
+      "Inocaluated virgin female" = "#32CD32",
+      "Inocaluated mated female" = "#64B39B",
+      "Inocaluated cohabiting female" = "#006400",
+      "Control virgin male" = "#FA8072",
+      "Control mated male" = "#EE2C2C",
+      "Control cohabiting male" = "#BA251F",
+      "Inocaluated virgin male" = "#FA8072",
+      "Inocaluated mated male" = "#EE2C2C",
+      "Inocaluated cohabiting male" = "#BA251F"
+      ),
+    breaks = set_legend_breaks, labels = set_legend_labels
+    ) + 
+  scale_linetype_manual(
+    values = c(
+      "Control virgin female" = "dashed",
+      "Control mated female" = "dashed",
+      "Control cohabiting female" = "dashed",
+      "Inocaluated virgin female" = "solid",
+      "Inocaluated mated female" = "solid",
+      "Inocaluated cohabiting female" = "solid",
+      "Control virgin male" = "dashed",
+      "Control mated male" = "dashed",
+      "Control cohabiting male" = "dashed",
+      "Inocaluated virgin male" = "solid",
+      "Inocaluated mated male" = "solid",
+      "Inocaluated cohabiting male" = "solid"
+    ),
+    breaks = set_legend_breaks, labels = set_legend_labels
+  ) +
+  geom_errorbar(linetype = 'solid') +
+  labs(x = "Days after spray", y = "Survival Probability", 
+       colour = "", linetype = "") +
+  thm + ylim(0,1) +
   facet_wrap(~Sex) +
-  theme_bw()
+  theme_classic()
 
+
+####  --------------------------    FS1    --------------------------  #####
+
+#### upper panel #### 
+
+read.csv("data/SSMI bootstrap.csv") %>% 
+  mutate(int_colour = paste(Mating_status, Sex) %>% tolower(),
+         tag = paste(Treatment, int_colour)) %>% 
+  mutate(Sex = recode(Sex, "female" = "Female", "male" = "Male"),
+         Mating_status = factor(Mating_status, 
+                                levels = c("Cohabiting","Virgin","Mated"))) %>% 
+  ggplot(aes(x = Day, y = est, ymin = lower, ymax = upper,
+             linetype = tag, 
+             colour = tag)) + 
+  geom_line(size = 0.5) + 
+  geom_point(size = 0.6) +
+  scale_colour_manual(
+    values = c(
+      "Control virgin female" = "#32CD32",
+      "Control mated female" = "#64B39B",
+      "Control cohabiting female" = "#006400",
+      "Inocaluated virgin female" = "#32CD32",
+      "Inocaluated mated female" = "#64B39B",
+      "Inocaluated cohabiting female" = "#006400",
+      "Control virgin male" = "#FA8072",
+      "Control mated male" = "#EE2C2C",
+      "Control cohabiting male" = "#BA251F",
+      "Inocaluated virgin male" = "#FA8072",
+      "Inocaluated mated male" = "#EE2C2C",
+      "Inocaluated cohabiting male" = "#BA251F"
+    ),
+    breaks = set_legend_breaks, labels = set_legend_labels
+  ) + 
+  scale_linetype_manual(
+    values = c(
+      "Control virgin female" = "dashed",
+      "Control mated female" = "dashed",
+      "Control cohabiting female" = "dashed",
+      "Inocaluated virgin female" = "solid",
+      "Inocaluated mated female" = "solid",
+      "Inocaluated cohabiting female" = "solid",
+      "Control virgin male" = "dashed",
+      "Control mated male" = "dashed",
+      "Control cohabiting male" = "dashed",
+      "Inocaluated virgin male" = "solid",
+      "Inocaluated mated male" = "solid",
+      "Inocaluated cohabiting male" = "solid"
+    ),
+    breaks = set_legend_breaks, labels = set_legend_labels
+  ) +
+  geom_errorbar(linetype = 'solid', alpha = 0.8, width = 0.6, size = 0.5) +
+  labs(x = "Days after spray", y = "Survival Probability", 
+       colour = "", linetype = "") +
+  thm + ylim(0,1) +
+  facet_wrap(~Mating_status) +
+  theme_classic()
+
+
+#### lower panel #### 
+
+df = read.csv("./data/SSMI raw.csv") %>% 
+  mutate(Mating_status = recode(Mating_status, "Cohabit"="Cohabiting"))
+surv_df =
+  df %>% 
+  filter(Mating_status != "Virgin CO2") %>%
+  mutate(sex = ifelse(Sex=="F", "female", "male"),
+         tag = paste(Mating_status, sex)) %>%
+  group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
+  group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
+  group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+  mutate(surv_per = 100*(1-Death/total))
+
+surv_rep = 
+  df %>% 
+  filter(Mating_status != "Virgin CO2") %>%
+  mutate(sex = ifelse(Sex=="F", "female", "male"),
+         tag = paste(Mating_status, sex)) %>%
+  group_by(Replicate,Mating_status,Sex,tag,Treatment) %>%
+  mutate(total = length(Death)) %>%
+  group_by(Replicate,Mating_status,Sex,tag,Treatment,Day,total) %>% 
+  summarise(Death = sum(Death)) %>%
+  group_by(Replicate,Mating_status,Sex,tag, Treatment,total) %>% 
+  mutate(Death=cumsum(Death)) %>%
+  mutate(surv_per = 100*(1-Death/total))
+
+levels(surv_df$Mating_status) = c("Cohabiting","Virgin","Mated","Virgin CO2") 
+levels(surv_rep$Mating_status) = c("Cohabiting","Virgin","Mated", "Virgin CO2") 
+
+ggplot(data=NULL,
+       aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+  geom_line(data=surv_df, size = 1, alpha = 0.5) +
+  geom_point(data=surv_rep, size = 0.6) +
+  scale_color_manual(
+    values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
+             "Cohabiting female"="#006400", "Virgin male"="#FA8072",
+             "Mated male"="#EE2C2C","Cohabiting male"="#BA251F"),
+    breaks=c("Virgin male","Mated male","Cohabiting male",
+             "Virgin female","Mated female","Cohabiting female")) +
+  scale_linetype_manual(values = c("dashed", "solid"), 
+                        labels = c("Control", "Fungal")) +
+  labs(linetype="", color="",
+       y = "Survival Percent (%)", color="Mating Status",
+       x = "Days after spray") +
+  ylim(0,100) +
+  theme_classic() +
+  facet_grid(~Mating_status)
 
 
 ### --------------------------    F2    --------------------------  
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### --------------------------    F3    --------------------------  
 
@@ -223,48 +380,7 @@ plot_fun6("CY1.5")
 
 ### --------------------------    FS1    --------------------------  
 
-df = read.csv("./data/SSMI raw.csv") %>% 
-  mutate(Mating_status = recode(Mating_status, "Cohabit"="Cohabiting"))
-surv_df =
-  df %>% 
-  filter(Mating_status != "Virgin CO2") %>%
-  mutate(sex = ifelse(Sex=="F", "female", "male"),
-         tag = paste(Mating_status, sex)) %>%
-  group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
-  group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
-  group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
-  mutate(surv_per = 100*(1-Death/total))
 
-surv_rep = 
-  df %>% 
-  filter(Mating_status != "Virgin CO2") %>%
-  mutate(sex = ifelse(Sex=="F", "female", "male"),
-         tag = paste(Mating_status, sex)) %>%
-  group_by(Replicate,Mating_status,Sex,tag,Treatment) %>%
-  mutate(total = length(Death)) %>%
-  group_by(Replicate,Mating_status,Sex,tag,Treatment,Day,total) %>% 
-  summarise(Death = sum(Death)) %>%
-  group_by(Replicate,Mating_status,Sex,tag, Treatment,total) %>% 
-  mutate(Death=cumsum(Death)) %>%
-  mutate(surv_per = 100*(1-Death/total))
-  
-ggplot(data=NULL,
-       aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
-  geom_line(data=surv_df, size = 0.9) +
-  geom_point(data=surv_rep, alpha=0.5, size=0.5) +
-  scale_color_manual(
-    values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
-             "Cohabiting female"="#006400", "Virgin male"="#FA8072",
-             "Mated male"="#EE2C2C","Cohabiting male"="#BA251F"),
-    breaks=c("Virgin male","Mated male","Cohabiting male",
-             "Virgin female","Mated female","Cohabiting female")) +
-  scale_linetype_manual(values = c("dashed", "solid"), labels = c("Control", "Fungal")) +
-  labs(linetype="", color="",
-       y = "Survival Percent (%)", color="Mating Status",
-       x = "Days after spray") +
-  ylim(0,100) +
-  theme_classic() +
-  facet_grid(~Mating_status)
 
 ### --------------------------    FS2 (done)    --------------------------  
 

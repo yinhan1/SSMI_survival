@@ -4,16 +4,16 @@
     "created" : 1579652756154.000,
     "dirty" : false,
     "encoding" : "UTF-8",
-    "folds" : "",
-    "hash" : "3285349399",
+    "folds" : "9|70|81|0|\n82|71|83|0|\n",
+    "hash" : "3795685613",
     "id" : "B3CA01DC",
-    "lastKnownWriteTime" : 1590949513,
-    "last_content_update" : 1590949513778,
+    "lastKnownWriteTime" : 1591207742,
+    "last_content_update" : 1591207742052,
     "path" : "~/Dropbox (CSU Fullerton)/Research/Flies/Kshama -- statistical analysis/summary -- Spring 2020/Figure R code/Figures.R",
     "project_path" : "Figure R code/Figures.R",
     "properties" : {
-        "cursorPosition" : "34,21",
-        "scrollLine" : "21"
+        "cursorPosition" : "189,0",
+        "scrollLine" : "165"
     },
     "read_only" : false,
     "read_only_alternatives" : [
