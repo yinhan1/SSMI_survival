@@ -166,14 +166,14 @@ tb_fit = cbind(tb_fit, predict(mod, tb_fit, interval = "confidence"))
 
 ```{r}
 # ggplot() +
-#   geom_point(data=tb_fit, aes(x=Day, y=fit), size=0.3) + 
+#   geom_point(data=tb_fit, aes(x=Day, y=fit), size=0.3) +
 #   geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr), size=0.5, width=0.4) +
-#   geom_bar(data=reps, aes(x=Day, y=larvaPsurv), stat="identity", bins=30, alpha=0.4) + 
+#   geom_bar(data=reps, aes(x=Day, y=larvaPsurv), stat="identity", bins=30, alpha=0.4) +
 #   geom_hline(data=test, aes(yintercept=grp.mean),
 #             color="blue", linetype="dashed", size=1.4, alpha=0.5) +
 #   facet_wrap(Treatment~Mating_status) +
 #   scale_colour_hue(name = " ",labels = c("Mean")) +
-#   labs(title = "Offspring Counts per Survival Female", 
+#   labs(title = "Offspring Counts per Survival Female",
 #        x="Days", y="Counts") + thm
 ```
 
@@ -210,12 +210,13 @@ ggplot(data=tb_fit,
   labs(x="Days after spray", y="Offspring count per surviving female")
 ```
 
-# ```{r}
-# ggplot() +
-#   geom_point(data=tb_fit, aes(x=Day, y=fit, linetype=Treatment, color=Mating_status), size=1.5) + 
-#   geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr,
-#                                  linetype=Treatment, color=Mating_status), size=0.5, width=0.5) +
-#   scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
-#   # geom_hline(data=test, aes(yintercept=grp.mean), color="blue", linetype="dashed", size=1.4, alpha=0.5)
-#   facet_wrap(~Mating_status)
+ ```{r} 
+ ggplot() +
+   geom_point(data=tb_fit, aes(x=Day, y=fit, linetype=Treatment, color=Mating_status), size=1.5) +
+  geom_errorbar(data=tb_fit, aes(x=Day, y=fit, ymin=lwr, ymax=upr,
+                                  linetype=Treatment, color=Mating_status), size=0.5, width=0.5) +
+   scale_linetype_manual(values=c("Control"="dotted","Fungal"="solid")) +
+  # geom_hline(data=test, aes(yintercept=grp.mean), color="blue", linetype="dashed", size=1.4, alpha=0.5)
+  facet_wrap(~Mating_status)
 ```
+

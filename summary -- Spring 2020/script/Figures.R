@@ -5,29 +5,27 @@ library(tidyverse)
 library(magrittr)
 library(ggsci)
 
-source("Figure R code/R functions.R")
-
-####  --------------------------    F1    --------------------------  #####
+####  --------------------------    F1    --------------------------  ####
 
 set_breaks <- 
   c("Control virgin female","Control mated female","Control cohabiting female",
-    "Inocaluated virgin female","Inocaluated mated female","Inocaluated cohabiting female",
+    "Inoculated virgin female","Inoculated mated female","Inoculated cohabiting female",
     "Control virgin male","Control mated male","Control cohabiting male",
-    "Inocaluated virgin male","Inocaluated mated male","Inocaluated cohabiting male")
+    "Inoculated virgin male","Inoculated mated male","Inoculated cohabiting male")
 
 set_labels <- 
   c("Control virgin female (n=265)",
     "Control mated female (n=270)",
     "Control cohabiting female (n=280)",
-    "Inocaluated virgin female (n=280)",
-    "Inocaluated mated female (n=276)",
-    "Inocaluated cohabiting female (n=271)",
+    "Inoculated virgin female (n=280)",
+    "Inoculated mated female (n=276)",
+    "Inoculated cohabiting female (n=271)",
     "Control virgin male (n=257)",
     "Control mated male (n=277)",
     "Control cohabiting male (n=277)",
-    "Inocaluated virgin male (n=272)",
-    "Inocaluated mated male (n=265)",
-    "Inocaluated cohabiting male (n=294)")
+    "Inoculated virgin male (n=272)",
+    "Inoculated mated male (n=265)",
+    "Inoculated cohabiting male (n=294)")
 
 read.csv("data/SSMI bootstrap.csv") %>% 
   mutate(int_colour = paste(Mating_status, Sex) %>% tolower(),
@@ -43,36 +41,36 @@ read.csv("data/SSMI bootstrap.csv") %>%
       "Control virgin female" = "#32CD32",
       "Control mated female" = "#64B39B",
       "Control cohabiting female" = "#006400",
-      "Inocaluated virgin female" = "#32CD32",
-      "Inocaluated mated female" = "#64B39B",
-      "Inocaluated cohabiting female" = "#006400",
+      "Inoculated virgin female" = "#32CD32",
+      "Inoculated mated female" = "#64B39B",
+      "Inoculated cohabiting female" = "#006400",
       "Control virgin male" = "#FA8072",
       "Control mated male" = "#EE2C2C",
       "Control cohabiting male" = "#BA251F",
-      "Inocaluated virgin male" = "#FA8072",
-      "Inocaluated mated male" = "#EE2C2C",
-      "Inocaluated cohabiting male" = "#BA251F"
+      "Inoculated virgin male" = "#FA8072",
+      "Inoculated mated male" = "#EE2C2C",
+      "Inoculated cohabiting male" = "#BA251F"
       ),
-    breaks = set_legend_breaks, labels = set_legend_labels
+    breaks = set_breaks, labels = set_labels
     ) + 
   scale_linetype_manual(
     values = c(
       "Control virgin female" = "dashed",
       "Control mated female" = "dashed",
       "Control cohabiting female" = "dashed",
-      "Inocaluated virgin female" = "solid",
-      "Inocaluated mated female" = "solid",
-      "Inocaluated cohabiting female" = "solid",
+      "Inoculated virgin female" = "solid",
+      "Inoculated mated female" = "solid",
+      "Inoculated cohabiting female" = "solid",
       "Control virgin male" = "dashed",
       "Control mated male" = "dashed",
       "Control cohabiting male" = "dashed",
-      "Inocaluated virgin male" = "solid",
-      "Inocaluated mated male" = "solid",
-      "Inocaluated cohabiting male" = "solid"
+      "Inoculated virgin male" = "solid",
+      "Inoculated mated male" = "solid",
+      "Inoculated cohabiting male" = "solid"
     ),
-    breaks = set_legend_breaks, labels = set_legend_labels
+    breaks = set_breaks, labels = set_labels
   ) +
-  geom_errorbar(linetype = 'solid') +
+  # geom_errorbar(linetype = "solid) +
   labs(x = "Days after spray", y = "Survival Probability", 
        colour = "", linetype = "") +
   thm + ylim(0,1) +
@@ -80,9 +78,34 @@ read.csv("data/SSMI bootstrap.csv") %>%
   theme_classic()
 
 
-####  --------------------------    FS1    --------------------------  #####
+####  --------------------------    FS1    --------------------------  ####
 
 #### upper panel #### 
+
+set_breaks =
+  c("Control cohabiting female","Inoculated cohabiting female",
+    "Control cohabiting male","Inoculated cohabiting male",
+    "Control virgin female","Inoculated virgin female",
+    "Control virgin male","Inoculated virgin male",
+    "Control mated female","Inoculated mated female",
+    "Control mated male","Inoculated mated male")
+
+set_labels <- 
+  c("Control cohabiting female (n=280)",
+    "Inoculated cohabiting female (n=271)",
+    "Control cohabiting male (n=277)",
+    "Inoculated cohabiting male (n=294)",
+    
+    "Control virgin female (n=265)",
+    "Inoculated virgin female (n=280)",
+    "Control virgin male (n=257)",
+    "Inoculated virgin male (n=272)",
+    
+    "Control mated female (n=270)",
+    "Inoculated mated female (n=276)",
+    "Control mated male (n=277)",
+    "Inoculated mated male (n=265)"
+    )
 
 read.csv("data/SSMI bootstrap.csv") %>% 
   mutate(int_colour = paste(Mating_status, Sex) %>% tolower(),
@@ -91,45 +114,44 @@ read.csv("data/SSMI bootstrap.csv") %>%
          Mating_status = factor(Mating_status, 
                                 levels = c("Cohabiting","Virgin","Mated"))) %>% 
   ggplot(aes(x = Day, y = est, ymin = lower, ymax = upper,
-             linetype = tag, 
-             colour = tag)) + 
-  geom_line(size = 0.5) + 
-  geom_point(size = 0.6) +
+             linetype = tag, colour = tag, group = tag)) + 
+  geom_line(size = 0.9) + 
+  geom_point(size = 1) +
   scale_colour_manual(
     values = c(
       "Control virgin female" = "#32CD32",
       "Control mated female" = "#64B39B",
       "Control cohabiting female" = "#006400",
-      "Inocaluated virgin female" = "#32CD32",
-      "Inocaluated mated female" = "#64B39B",
-      "Inocaluated cohabiting female" = "#006400",
+      "Inoculated virgin female" = "#32CD32",
+      "Inoculated mated female" = "#64B39B",
+      "Inoculated cohabiting female" = "#006400",
       "Control virgin male" = "#FA8072",
       "Control mated male" = "#EE2C2C",
       "Control cohabiting male" = "#BA251F",
-      "Inocaluated virgin male" = "#FA8072",
-      "Inocaluated mated male" = "#EE2C2C",
-      "Inocaluated cohabiting male" = "#BA251F"
+      "Inoculated virgin male" = "#FA8072",
+      "Inoculated mated male" = "#EE2C2C",
+      "Inoculated cohabiting male" = "#BA251F"
     ),
-    breaks = set_legend_breaks, labels = set_legend_labels
+    breaks = set_breaks, labels = set_labels
   ) + 
   scale_linetype_manual(
     values = c(
       "Control virgin female" = "dashed",
       "Control mated female" = "dashed",
       "Control cohabiting female" = "dashed",
-      "Inocaluated virgin female" = "solid",
-      "Inocaluated mated female" = "solid",
-      "Inocaluated cohabiting female" = "solid",
+      "Inoculated virgin female" = "solid",
+      "Inoculated mated female" = "solid",
+      "Inoculated cohabiting female" = "solid",
       "Control virgin male" = "dashed",
       "Control mated male" = "dashed",
       "Control cohabiting male" = "dashed",
-      "Inocaluated virgin male" = "solid",
-      "Inocaluated mated male" = "solid",
-      "Inocaluated cohabiting male" = "solid"
+      "Inoculated virgin male" = "solid",
+      "Inoculated mated male" = "solid",
+      "Inoculated cohabiting male" = "solid"
     ),
-    breaks = set_legend_breaks, labels = set_legend_labels
+    breaks = set_breaks, labels = set_labels
   ) +
-  geom_errorbar(linetype = 'solid', alpha = 0.8, width = 0.6, size = 0.5) +
+  # geom_errorbar(linetype = 'solid', alpha = 0.8, width = 0.6, size = 0.5) +
   labs(x = "Days after spray", y = "Survival Probability", 
        colour = "", linetype = "") +
   thm + ylim(0,1) +
@@ -139,23 +161,26 @@ read.csv("data/SSMI bootstrap.csv") %>%
 
 #### lower panel #### 
 
-df = read.csv("./data/SSMI raw.csv") %>% 
-  mutate(Mating_status = recode(Mating_status, "Cohabit"="Cohabiting"))
+df = read.csv("data/SSMI raw.csv") %>% 
+  mutate(Mating_status = recode(Mating_status, "Cohabit" = "Cohabiting"),
+         Treatment = recode(Treatment, "Fungal" = "Inoculated")) %>% 
+  filter(Mating_status != "Virgin CO2") %>%
+  droplevels() %>% 
+  mutate(sex = ifelse(Sex=="F", "female", "male"),
+         tag = as.factor(paste(Treatment, tolower(Mating_status), sex)))
+
 surv_df =
   df %>% 
-  filter(Mating_status != "Virgin CO2") %>%
-  mutate(sex = ifelse(Sex=="F", "female", "male"),
-         tag = paste(Mating_status, sex)) %>%
-  group_by(Mating_status,Sex,tag,Treatment) %>% mutate(total = length(Death)) %>%
-  group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% summarise(Death = sum(Death)) %>%
-  group_by(Mating_status,Sex,tag, Treatment,total) %>% mutate(Death=cumsum(Death)) %>%
+  group_by(Mating_status,Sex,tag,Treatment) %>% 
+  mutate(total = length(Death)) %>%
+  group_by(Mating_status,Sex,tag,Treatment,Day,total) %>% 
+  summarise(Death = sum(Death)) %>%
+  group_by(Mating_status,Sex,tag, Treatment,total) %>% 
+  mutate(Death=cumsum(Death)) %>%
   mutate(surv_per = 100*(1-Death/total))
 
 surv_rep = 
   df %>% 
-  filter(Mating_status != "Virgin CO2") %>%
-  mutate(sex = ifelse(Sex=="F", "female", "male"),
-         tag = paste(Mating_status, sex)) %>%
   group_by(Replicate,Mating_status,Sex,tag,Treatment) %>%
   mutate(total = length(Death)) %>%
   group_by(Replicate,Mating_status,Sex,tag,Treatment,Day,total) %>% 
@@ -164,41 +189,94 @@ surv_rep =
   mutate(Death=cumsum(Death)) %>%
   mutate(surv_per = 100*(1-Death/total))
 
-levels(surv_df$Mating_status) = c("Cohabiting","Virgin","Mated","Virgin CO2") 
-levels(surv_rep$Mating_status) = c("Cohabiting","Virgin","Mated", "Virgin CO2") 
-
 ggplot(data=NULL,
-       aes(x=Day, y=surv_per, linetype=Treatment, color=tag)) +
+       aes(x=Day, y=surv_per, linetype=tag, color=tag, group=tag)) +
   geom_line(data=surv_df, size = 1, alpha = 0.5) +
   geom_point(data=surv_rep, size = 0.6) +
   scale_color_manual(
-    values=c("Virgin female"="#32CD32", "Mated female"="#64B39B",
-             "Cohabiting female"="#006400", "Virgin male"="#FA8072",
-             "Mated male"="#EE2C2C","Cohabiting male"="#BA251F"),
-    breaks=c("Virgin male","Mated male","Cohabiting male",
-             "Virgin female","Mated female","Cohabiting female")) +
-  scale_linetype_manual(values = c("dashed", "solid"), 
-                        labels = c("Control", "Fungal")) +
+  values = c(
+    "Control virgin female" = "#32CD32",
+    "Control mated female" = "#64B39B",
+    "Control cohabiting female" = "#006400",
+    "Inoculated virgin female" = "#32CD32",
+    "Inoculated mated female" = "#64B39B",
+    "Inoculated cohabiting female" = "#006400",
+    "Control virgin male" = "#FA8072",
+    "Control mated male" = "#EE2C2C",
+    "Control cohabiting male" = "#BA251F",
+    "Inoculated virgin male" = "#FA8072",
+    "Inoculated mated male" = "#EE2C2C",
+    "Inoculated cohabiting male" = "#BA251F"
+  ),
+  breaks = set_breaks, labels = set_labels
+  ) + 
+  scale_linetype_manual(
+    values = c(
+      "Control virgin female" = "dashed",
+      "Control mated female" = "dashed",
+      "Control cohabiting female" = "dashed",
+      "Inoculated virgin female" = "solid",
+      "Inoculated mated female" = "solid",
+      "Inoculated cohabiting female" = "solid",
+      "Control virgin male" = "dashed",
+      "Control mated male" = "dashed",
+      "Control cohabiting male" = "dashed",
+      "Inoculated virgin male" = "solid",
+      "Inoculated mated male" = "solid",
+      "Inoculated cohabiting male" = "solid"
+    ),
+    breaks = set_breaks, labels = set_labels
+  ) +
   labs(linetype="", color="",
        y = "Survival Percent (%)", color="Mating Status",
        x = "Days after spray") +
   ylim(0,100) +
   theme_classic() +
   facet_grid(~Mating_status)
+  
 
 
 ### --------------------------    F2    --------------------------  
 
+reps <- read.csv("data/SSMI larva.csv") %>% 
+  mutate(Treatment = recode(Treatment, "Fungal" = "Inoculated"))
+model <- lm(larvaPsurv ~ Day + Treatment + Mating_status + 
+              Treatment:Mating_status + Day:Treatment, reps)
 
+tb_fit <- reps %>% select(Day, Treatment, Mating_status) %>% unique()
+tb_fit <- cbind(tb_fit, predict(model, tb_fit, interval = "confidence")) %>% 
+  mutate(tag = as.factor(paste(Treatment, tolower(Mating_status))))
 
+set_breaks = c("Control cohabit","Inoculated cohabit",
+               "Control mated","Inoculated mated")
 
-
-
-
-
-
-
-
+ggplot(data = tb_fit, 
+       aes(x = Day, y = fit, ymin = lwr, ymax = upr,
+           linetype = tag, color = tag, group = tag)) +
+  geom_line(size = 0.9) +
+  geom_point(size = 1) +
+  # geom_errorbar(size=0.5, width=0.5) +
+  scale_linetype_manual(
+    values = c(
+      "Control cohabit" = "dashed",
+      "Inoculated cohabit" = "solid",
+      "Control mated" = "dashed",
+      "Inoculated mated" = "solid"
+    ), 
+    breaks = set_breaks
+  ) +
+  scale_color_manual(
+    values = c(
+      "Control cohabit" = "#006400",
+      "Inoculated cohabit" = "#006400",
+      "Control mated" = "#64B39B",
+      "Inoculated mated" = "#64B39B"
+    ),
+    breaks = set_breaks
+  ) +
+  theme_classic() +
+  labs(x = "Days after spray", 
+       y = "Offspring count per surviving female per day")
 
 
 
@@ -224,45 +302,10 @@ labels = read.csv("./data/DIET 2 raw.csv") %>%
   group_by(Diet,Treatment,Sex) %>% 
   summarise(Initial=sum(Initial.density))
 
-plot_fun4 = function(d){
-  set_label = 
-    labels %>% 
-    filter(Diet==d) %>% 
-    mutate(Sex = ifelse(Sex=="M", "Male","Female"),
-           Sex = factor(Sex, levels=c("Male","Female")),
-           tag = paste0(Treatment," ",Sex, " (n=",Initial,")")) %>% 
-    arrange(Treatment,Sex)
-  
-  bind_rows(df,df_initial) %>% 
-    filter(Diet == d) %>% 
-    mutate(tag = factor(paste(Treatment, Sex), 
-                        levels=c("Control Male","Control Female",
-                                 "Fungal Male","Fungal Female"))) %>% 
-    ggplot(aes(x=day, y=est, ymin=lower, ymax=upper, color=tag, linetype=tag,
-               group=interaction(Diet,tag))) +
-    geom_errorbar(width=0.5,size=0.5,alpha=0.7) +
-    geom_line(size=1) +
-    geom_point(size=1) +
-    scale_x_continuous(breaks=seq(0,12,4)) +
-    scale_linetype_manual(values=c("Control Female"="dotted",
-                                   "Control Male"="dotted",
-                                   "Fungal Female"="solid",
-                                   "Fungal Male"="solid"),
-                          labels=set_label$tag) +
-    scale_color_manual(values=c("Control Female"="darkgreen",
-                                "Control Male"="brown",
-                                "Fungal Female"="darkgreen",
-                                "Fungal Male"="brown"),
-                       labels=set_label$tag) +
-    facet_grid(~Diet) +
-    labs(x="Days after spray", y="Survival Probability", color="", linetype="") +
-    theme_classic()
-}
-
-plot_fun4("C/C")
-plot_fun4("C/G")
-plot_fun4("G/G")
-plot_fun4("G/C")
+plot_fun4("C/C") + ylim(0.5,1)
+plot_fun4("C/G") + ylim(0.5,1)
+plot_fun4("G/G") + ylim(0.5,1)
+plot_fun4("G/C") + ylim(0.5,1)
 
 
 ### --------------------------    F5    --------------------------  
