@@ -1,0 +1,445 @@
+---
+title: "Diet 3 Analysis"
+author: "Han Yin"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  bookdown::html_document2:
+    number_sections: no
+    fig_caption: true
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    code_folding: hide
+header-includes:
+- \usepackage{graphicx}
+- \usepackage{float}
+editor_options:
+  chunk_output_type: inline
+---
+
+```{r setup knit, include=FALSE}
+knitr::opts_chunk$set(
+	fig.align = "center",
+	fig.pos = "H",
+  fig.height = 3,
+	fig.width = 5,
+	message = FALSE,
+	warning = FALSE,
+	external = TRUE,
+	echo = TRUE
+)
+```
+
+```{r library and dataset}
+library(magrittr)
+library(tidyverse)
+library(fastDummies)
+
+library(ggsci)
+
+library(survival)
+library(survminer)
+
+setwd("/Users/hanyin/Dropbox (CSU Fullerton)/Research Project/Flies/Arnie -- statistical analysis/DIET 3 - Yeast Variation")
+
+rep1 = readxl::read_excel("data/SSMI_YeastVariation.xlsx", sheet = 1) %>% na.omit()
+rep2 = readxl::read_excel("data/SSMI_YeastVariation.xlsx", sheet = 2) %>% na.omit()
+
+df = bind_rows(rep1,rep2) %>% 
+  mutate(Diet = gsub(" ", "", Diet, fixed = TRUE)) %>%
+  filter(Day<=12)
+
+# write.csv(df,"DIET 3 raw.csv")
+```
+
+### Raw data plot {.tabset}
+
+#### Replicates combined
+
+```{r replicates combined, fig.width=8, fig.height=4}
+day_end = df %>% 
+  group_by(Population,Diet,Treatment,Sex,Day) %>% 
+  summarize(Death = sum(Death), Initial = sum(`Initial Density`)) %>% 
+  group_by(Population,Diet,Treatment,Sex) %>% 
+  mutate(Deaths = cumsum(Death)) %>% 
+  ungroup() %>% 
+  mutate(surv_per = 1-Deaths/Initial) %>% 
+  select(-c(Death,Initial,Deaths))
+
+day_initial = day_end %>% select(-c(Day,surv_per)) %>% 
+  unique() %>% 
+  mutate(Day=0, surv_per = 1)
+
+neworder = c("Cornmeal", "C+0.5Y","C+1.0Y","C+1.5Y")
+
+dummy = bind_rows(day_initial,day_end) %>% 
+  mutate(Diet = factor(Diet, levels=neworder),
+         Sex = recode(Sex, "M"="Male", "F"="Female"),
+         Sex = factor(Sex, levels=c("Male","Female")))
+# write.csv(dummy,"DIET 3 raw.csv")
+dummy %>% 
+  ggplot(aes(x=Day, y=surv_per*100, linetype=Treatment, color=Diet, shape=Sex)) + 
+  geom_point() + 
+  geom_line() +
+  scale_color_jco() +
+  scale_linetype_manual(values = c("Control"="dotted","Fungal"="solid")) +
+  scale_shape_manual(values = c("Male"=19, "Female"=2), guide = guide_legend(reverse = TRUE)) +
+  labs(y="Survival Percent (%)",  shape="", color="", linetype="") +
+  ylim(50, 100) +
+  theme_minimal() +
+  guides(linetype = guide_legend(order=1),
+         color = guide_legend(order=2),
+         shape = guide_legend(order=3))
+```
+
+#### Replicate 1
+
+```{r replicate 1, fig.width=15, fig.height=5}
+day_end = df %>%
+  group_by(Replicate,Population,Diet,Treatment,Sex,Day) %>%
+  summarize(Death = sum(Death), Initial = sum(`Initial Density`)) %>%
+  group_by(Replicate,Population,Diet,Treatment,Sex) %>%
+  mutate(Deaths = cumsum(Death)) %>%
+  ungroup() %>%
+  mutate(surv_per = 1-Deaths/Initial) %>%
+  select(-c(Death,Initial,Deaths))
+
+day_initial = day_end %>% select(-c(Day,surv_per)) %>%
+  unique() %>%
+  mutate(Day=0, surv_per = 1)
+
+bind_rows(day_initial,day_end) %>%
+  filter(Replicate == 1) %>%
+  ggplot(aes(x=Day, y=surv_per*100, linetype=Treatment, color=Diet, shape=Sex)) +
+  geom_line() +
+  geom_point() +
+  scale_color_jco() +
+  scale_linetype_manual(values = c("Control"="dotted","Fungal"="solid")) +
+  labs(y="Survival Percent (%)", color="", shape="", linetype="") +
+  facet_wrap(Replicate~Diet, nrow=1) +
+  ylim(50, 100) +
+  theme_minimal()
+```
+
+#### Replicate 2
+
+```{r replicate 2, fig.width=15, fig.height=5}
+bind_rows(day_initial,day_end) %>%
+  filter(Replicate == 2) %>%
+  ggplot(aes(x=Day, y=surv_per*100, linetype=Treatment, color=Diet, shape=Sex)) +
+  geom_line() +
+  geom_point() +
+  scale_color_jco() +
+  scale_linetype_manual(values = c("Control"="dotted","Fungal"="solid")) +
+  labs(y="Survival Percent (%)", color="", shape="", linetype="") +
+  facet_wrap(Replicate~Diet, nrow=1) +
+  ylim(50, 100) +
+  theme_minimal()
+```
+
+
+
+### Data manipulation
+
+```{r death count to status}
+n = nrow(df)
+
+# duplicate dead 
+dead = df[ rep(c(1:n), df$Death), ] %>% mutate(Death = 1) %>% select(-c(`Initial Density`))
+
+# count alive
+alive = df %>% 
+  group_by(Replicate,Population,Cage_Number,Diet,Treatment,Sex) %>%
+  summarise(Deaths = sum(Death), Initial = max(`Initial Density`)) %>% 
+  ungroup() %>%
+  mutate(Alive = Initial - Deaths)
+
+# duplicate alive
+n = nrow(alive)
+alive = alive[ rep(c(1:n), alive$Alive), ] %>% mutate(Day = 12, Death = 0)
+alive = alive[c(names(dead))]
+
+# concatenate dead and alive
+df = rbind(alive, dead) %>% 
+  mutate_at(c("Replicate","Population","Cage_Number","Diet","Treatment","Sex"), function(x) as.factor(x)) 
+
+```
+
+
+### Test Replicates {.tabset}
+
+```{r function to test replicate}
+test_replicate = function(diet_type){
+  subset = df %>% filter(Diet == diet_type)
+  fit = survfit(Surv(Day, Death) ~ Replicate, data = subset)
+  pairwise_survdiff(Surv(Day, Death == 1) ~ Replicate, p.adjust.method = "holm", data = subset)
+}
+```
+
+#### Overall
+
+```{r}
+fit = survfit(Surv(Day, Death) ~ Replicate, data = df)
+pairwise_survdiff(Surv(Day, Death == 1) ~ Replicate, p.adjust.method = "holm", data = df)
+```
+
+#### Cornmeal
+
+```{r}
+test_replicate("Cornmeal")
+```
+
+#### C+0.5Y
+
+```{r}
+test_replicate("C+0.5Y")
+```
+
+#### C+1.0Y
+
+```{r}
+test_replicate("C+1.0Y")
+```
+
+#### C+1.5Y
+
+```{r}
+test_replicate("C+1.5Y")
+```
+
+### Cox Model
+
+#### 1. Check proportionality
+
+```{r}
+mod = coxph(Surv(Day, Death) ~ Treatment + Diet + Sex, data = df)
+cox.zph(mod)
+```
+
+#### 2. Potential splittting point {.tabset}
+
+##### Treatment
+
+```{r}
+mod = coxph(Surv(Day, Death) ~ strata(Treatment) + Diet + Sex, data = df)
+pred = survfit(mod)
+plot(pred, lty = 1:2, col = c("red","blue"))
+```
+
+##### Diet
+
+```{r}
+mod = coxph(Surv(Day, Death) ~ Treatment + strata(Diet) + Sex, data = df)
+pred = survfit(mod)
+plot(pred, lty = 1:4, col = c("red","blue","green","black"))
+```
+
+#### Sex
+
+```{r}
+mod = coxph(Surv(Day, Death) ~ Treatment + Diet + strata(Sex), data = df)
+pred = survfit(mod)
+plot(pred, lty = 1:4, col = c("red","blue","green","black"))
+```
+
+#### 3. Convert to time-dependent
+
+```{r choose time points}
+# split the data into intervals
+a1 = 5; a2 = 8; 
+split_time = c(a1,a2)
+df2 = survSplit(df, cut=split_time, end="Day", event="Death", start="Start") %>%
+  mutate(Diet = gsub(",", "_", Diet)) %>%
+  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+         Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0,
+         Diet = recode(Diet, Cornmeal = "0", `C+0.5Y` = "1", `C+1.0Y` = "2", `C+1.5Y` = "3")) %>% 
+  dummy_cols("Diet")
+
+# build time-dependent model
+mod = coxph(Surv(Start, Day, Death) ~
+              Fungal:gt1 + Fungal:gt2 + Fungal:gt3 + 
+              Female:gt1 + Female:gt2 + Female:gt3 +
+              
+              Diet_0:gt1 + Diet_0:gt2 + Diet_0:gt3 + 
+              Diet_1:gt1 + Diet_1:gt2 + Diet_1:gt3 + 
+              Diet_2:gt1 + Diet_2:gt2 + Diet_2:gt3 +
+              
+              Female:Fungal:gt1 + Female:Fungal:gt2 + Female:Fungal:gt3 + 
+              Fungal:Diet_0:gt1 + Fungal:Diet_0:gt2 + Fungal:Diet_0:gt3 +
+              
+              Female:Diet_0:Fungal:gt1 + Female:Diet_0:Fungal:gt2 + Female:Diet_0:Fungal:gt3 + 
+              Female:Diet_1:Fungal:gt1 + Female:Diet_1:Fungal:gt2 + Female:Diet_1:Fungal:gt3,
+            df2)
+
+
+# test assumptions again
+# cox.zph(mod)
+# summary(mod)
+extractAIC(mod) # 43012.71
+```
+
+#### 4. Table of Hazard Ratios
+
+```{r}
+beta = coef(mod)
+diff = c(
+  0,0,0,  # fungal
+  0,0,0,  # female
+  
+  0,0,0,  # c
+  0,0,-1,  # 0.5
+  0,0,1,  # 1.0
+  
+  0,0,0,  # female fungal
+  0,0,0,  # fungal c
+  
+  0,0,0,  # female fungal c
+  0,0,0   # female fungal 0.5
+)
+
+t_obs = (beta%*%diff) / sqrt(t(diff) %*% vcov(mod) %*% diff)
+c(exp(beta%*%diff),
+2*(1-pt(abs(t_obs), length(beta))))
+```
+
+#### 5. Calculate Survival Prob
+
+```{r}
+get_interaction = function(data){
+ data %>% 
+    mutate(t1_fun=Fungal*gt1, t2_fun=Fungal*gt2, t3_fun=Fungal*gt3, 
+           t1_fm=Female*gt1, t2_fm=Female*gt2, t3_fm=Female*gt3, 
+           t1_d0=Diet_0*gt1, t2_d0=Diet_0*gt2, t3_d0=Diet_0*gt3, 
+           d1=Diet_1, d2=Diet_2,
+           t1_fun_fm_d0=Fungal*Female*Diet_0*gt1, t2_fun_fm_d0=Fungal*Female*Diet_0*gt2, 
+           t3_fun_fm_d0=Fungal*Female*Diet_0*gt3, 
+           fun_fm_d1=Fungal*Female*Diet_1, fun_fm_d2=Fungal*Female*Diet_2)
+}
+
+get_time_data = function(data){
+  data = survSplit(data, cut=split_time, end="Day", event="Death", start="Start") %>% 
+    mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
+         Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0, 
+         Diet = recode(Diet, Cornmeal = "0", `C+0.5Y` = "1", `C+1.0Y` = "2", `C+1.5Y` = "3")) %>% 
+    dummy_cols("Diet") %>% 
+    get_interaction()
+  return(data)
+}
+
+category = ungroup(df) %>% 
+  select(Treatment,Sex,Diet) %>% 
+  unique() %>% 
+  set_rownames(NULL) %>% 
+  arrange(Treatment,Sex,Diet) %>% 
+  mutate(Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0,
+         Diet = recode(Diet, Cornmeal="0", `C+0.5Y`="1", `C+1.0Y`="2", `C+1.5Y`="3")) %>% 
+  dummy_cols("Diet")
+
+time_intervals = data.frame(Start=c(0,a1,a2), Day=c(a1,a2,12), 
+                            gt1=c(1,0,0), gt2=c(0,1,0), gt3=c(0,0,1), Death=1)
+
+pred_surv = function(data){
+  mod = coxph(Surv(Start, Day, Death) ~ 
+                t1_fun + t2_fun + t3_fun + 
+                t1_fm + t2_fm + t3_fm +
+                t1_d0 + t2_d0 + t3_d0 + 
+                d1 + d2 +
+                t1_fun_fm_d0 + t2_fun_fm_d0 + t3_fun_fm_d0 +  
+                fun_fm_d1 + fun_fm_d2,
+              data = get_time_data(data))
+  
+  surv = c()
+  for (i in 1:nrow(category)){
+    test = category[rep(i,nrow(time_intervals)),] %>%
+      bind_cols(time_intervals) %>%
+      get_interaction()
+    
+    mod_summary = summary(survfit(mod, newdata = test, individual = TRUE))
+    time = mod_summary$time
+    est = mod_summary$surv
+    
+    insert = setdiff(1:12, time)
+    time = c(time, insert)
+    
+    est = c(1, est, rep(NA, length(insert)))
+    surv_i = cbind(category[rep(i,13),], est = est, day = c(0,time)) %>% arrange(day)
+    surv = rbind(surv, surv_i)
+  }
+  return(surv)
+}
+
+est = pred_surv(df) 
+```
+
+```{r fig.width=15, fig.height=5}
+est %>% filter(est>0.01) %>% 
+  mutate(Diet = recode(Diet, "0"="C", "1"="CY0.5", "2"="CY1.0", "3"="CY1.5")) %>% 
+  ggplot(aes(x=day, y=est, linetype=Treatment, shape=Sex, color=Diet)) + 
+  geom_point() + 
+  geom_line() +
+  scale_color_jco() +
+  scale_linetype_manual(values = c("Control"="dashed","Fungal"="solid")) +
+  scale_shape_manual(values = c("F"=2, "M"=19), guide = guide_legend(reverse = TRUE)) +
+  ylim(0.5, 1) +
+  theme_minimal() + 
+  labs(y="Survival Probabilities", color="", shape="", linetype="") +
+  facet_wrap(~Diet, nrow=1)
+```
+
+#### 6. Bootstrap confidence intervals
+
+```{r bootstrap ci}
+B = 200
+bound = 0.95
+
+# function to extract bounds
+ci_calculator = function(data){
+  ci = data.frame(lower = as.numeric(), upper = as.numeric())
+  for (i in 1:(max(data$Day)+1)) {
+    ci[i,1] = quantile(data$est[data$Day == (i-1)], (1-bound)/2, na.rm = TRUE)
+    ci[i,2] = quantile(data$est[data$Day == (i-1)], (1+bound)/2, na.rm = TRUE)
+  }
+  return(ci)
+}
+
+dff = df %>% mutate(Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0,
+         Diet = recode(Diet, Cornmeal="0", `C+0.5Y`="1", `C+1.0Y`="2", `C+1.5Y`="3")) %>% 
+  dummy_cols("Diet")
+
+# repeat B times
+dummy = c()
+for (i in 1:B){
+  dummy_i = c()
+  for (j in 1:nrow(category)){
+    dummy_ij = merge(dff, category[j,])
+    a = nrow(dummy_ij)
+    rows_to_take = sample(a, a, replace = TRUE)
+    dummy_i = rbind(dummy_i, dummy_ij[rows_to_take,])
+    }
+  dummy_i = pred_surv(dummy_i)
+  dummy = bind_rows(dummy, dummy_i)
+}
+
+# get confidence intervals
+survs = c()
+for (i in 1:nrow(category)){
+  ci = merge(dummy, category[i,]) %>% mutate(Day=day) %>% ci_calculator()
+  surv = merge(est, category[i,]) %>% arrange(day)
+  surv = cbind(surv, ci)
+  survs = rbind(survs, surv)
+}
+
+# recode labels
+df_plot = 
+  survs %>% 
+  select(Treatment, Diet, Sex,day,est,lower,upper) %>% 
+  mutate(Diet = recode(Diet, "0"="C", "1"="CY0.5", "2"="CY1.0", "3"="CY1.5"))
+
+# write.csv(df_plot, "Diet 3 bootstrap.csv")
+```
+
+
+
+
+
+
