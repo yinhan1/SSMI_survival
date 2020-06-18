@@ -40,7 +40,7 @@ library(ggsci)
 library(survival)
 library(survminer)
 
-cut_off = 10
+cut_off = 9
 
 rep1 = readxl::read_excel("data/SSMI_DietSwitch.xlsx", sheet = 1) %>% na.omit()
 rep2 = readxl::read_excel("data/SSMI_DietSwitch.xlsx", sheet = 2) %>% na.omit()
@@ -128,7 +128,8 @@ bind_rows(day_initial,day_end) %>%
   ylim(0.35,1) +
   labs(linetype="", color="", shape="") +
   theme_minimal()
-```
+``` 
+
 
 #### Replicate 3
 
@@ -249,46 +250,8 @@ plot(pred, lty = 1:2, col = c("red","blue"))
 
 #### 3. Convert to time-dependent
 
-```{r choose time points}
-# split the data into intervals
-a1 = 3; a2 = 8; 
-split_time = c(a1,a2)
-df2 = survSplit(df, cut=split_time, end="Day", event="Death", start="Start") %>%
-  mutate(Diet = gsub(",", "_", Diet)) %>%
-  mutate(gt1 = (Start==0)+0, gt2 = (Start==a1)+0, gt3 = (Start==a2)+0,
-         Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0) %>% 
-  dummy_cols("Diet")
-  
-# build time-dependent model
-mod = coxph(Surv(Start, Day, Death) ~ 
-              
-              Fungal:gt1 + Fungal:gt2 + Fungal:gt3 +
-              Female:gt1 + Female:gt2 + Female:gt3 + 
-              
-              `Diet_G/G`:gt1 + `Diet_G/G`:gt2 + `Diet_G/G`:gt3 +
-              `Diet_G/C`:gt1 + `Diet_G/C`:gt2 + `Diet_G C`:gt3 +
-              `Diet_C/G`:gt1 + `Diet_C/G`:gt2 + `Diet_C/G`:gt3 +
-              
-              Fungal:Female:gt1 + Fungal:Female:gt2 + Fungal:Female:gt3 +
-              
-              `Diet_G/G`:Fungal:gt1 + `Diet_G/G`:Fungal:gt2 + `Diet_G/G`:Fungal:gt3 +
-              `Diet_G/C`:Fungal:gt1 + `Diet_G/C`:Fungal:gt2 + `Diet_G/C`:Fungal:gt3 +
-              `Diet_C/G`:Fungal:gt1 + `Diet_C/G`:Fungal:gt2 + `Diet_C/G`:Fungal:gt3 +
-            
-              `Diet_G/G`:Female:Fungal:gt1 + `Diet_G/G`:Female:Fungal:gt2 + `Diet_G/G`:Female:Fungal:gt3 +
-              `Diet_C/G`:Female:Fungal:gt1 + `Diet_C/G`:Female:Fungal:gt2 + `Diet_C/G`:Female:Fungal:gt3,
-              
-              df2)
-
-# test assumptions again
-# cox.zph(mod)
-# cox.zph(mod, transform = log)
-# summary(mod)
-extractAIC(mod)
-```
-
 ```{r}
-a1 = 2; a2 = 4; a3 = 8
+a1 = 3; a2 = 5; a3 = 8
 split_time = c(a1,a2,a3)
 df2 = survSplit(df, cut=split_time, end="Day", event="Death", start="Start") %>%
   mutate(Diet = gsub(",", "_", Diet)) %>%
@@ -303,7 +266,7 @@ mod = coxph(Surv(Start, Day, Death) ~
               Female:gt1 + Female:gt2 + Female:gt3 + Female:gt4 + 
               
               `Diet_G/G`:gt1 + `Diet_G/G`:gt2 + `Diet_G/G`:gt3 + `Diet_G/G`:gt4 +
-              `Diet_G/C`:gt1 + `Diet_G/C`:gt2 + `Diet_G C`:gt3 + `Diet_G C`:gt4 + 
+              `Diet_G/C`:gt1 + `Diet_G/C`:gt2 + `Diet_G/C`:gt3 + `Diet_G/C`:gt4 + 
               `Diet_C/G`:gt1 + `Diet_C/G`:gt2 + `Diet_C/G`:gt3 + `Diet_C/G`:gt4 +
               
               Fungal:Female:gt1 + Fungal:Female:gt2 + Fungal:Female:gt3 + Fungal:Female:gt4 +
@@ -314,18 +277,102 @@ mod = coxph(Surv(Start, Day, Death) ~
             
               `Diet_G/G`:Female:Fungal:gt1 + `Diet_G/G`:Female:Fungal:gt2 + `Diet_G/G`:Female:Fungal:gt3 +
               `Diet_G/G`:Female:Fungal:gt4 +
+              `Diet_G/C`:Female:Fungal:gt1 + `Diet_G/C`:Female:Fungal:gt2 + `Diet_G/C`:Female:Fungal:gt3 +
+              `Diet_G/C`:Female:Fungal:gt4 +
               `Diet_C/G`:Female:Fungal:gt1 + `Diet_C/G`:Female:Fungal:gt2 + `Diet_C/G`:Female:Fungal:gt3 +
               `Diet_C/G`:Female:Fungal:gt4,
-              
               df2)
-
-# test assumptions again
-# cox.zph(mod)
-# cox.zph(mod, transform = log)
-# summary(mod)
 extractAIC(mod)
 ```
 
+```{r}
+get_interaction = function(data){
+  data %>% 
+    mutate(
+      t1_fun=Fungal*gt1, t2_fun=Fungal*gt2, t3_fun=Fungal*gt3, t4_fun=Fungal*gt4,
+      t1_fem=Female*gt1, t2_fem=Female*gt2, t3_fem=Female*gt3, t4_fem=Female*gt4,
+ 
+      t1_gg=`Diet_G/G`*gt1, t2_gg=`Diet_G/G`*gt2, t3_gg=`Diet_G/G`*gt3, t4_gg=`Diet_G/G`*gt4,
+      t1_gc=`Diet_G/C`*gt1, t2_gc=`Diet_G/C`*gt2, t3_gc=`Diet_G/C`*gt3, t4_gc=`Diet_G/C`*gt4, 
+      t1_cg=`Diet_C/G`*gt1, t2_cg=`Diet_C/G`*gt2, t3_cg=`Diet_C/G`*gt3, t4_cg=`Diet_C/G`*gt4, 
+      
+      ff1=Fungal*Female*gt1, ff2=Fungal*Female*gt2, ff3=Fungal*Female*gt3, ff4=Fungal*Female*gt4, 
+    
+      f1_gg=Fungal*`Diet_G/G`*gt1, f2_gg=Fungal*`Diet_G/G`*gt2, 
+      f3_gg=Fungal*`Diet_G/G`*gt3, f4_gg=Fungal*`Diet_G/G`*gt4,
+      
+      f1_gc=Fungal*`Diet_G/C`*gt1, f2_gc=Fungal*`Diet_G/C`*gt2, 
+      f3_gc=Fungal*`Diet_G/C`*gt3, f4_gc=Fungal*`Diet_G/C`*gt4, 
+      
+      f1_cg=Fungal*`Diet_C/G`*gt1, f2_cg=Fungal*`Diet_C/G`*gt2, 
+      f3_cg=Fungal*`Diet_C/G`*gt3, f4_cg=Fungal*`Diet_C/G`*gt4, 
+    
+      ff1_gc=Fungal*Female*`Diet_G/C`*gt1, ff2_gc=Fungal*Female*`Diet_G/C`*gt2, 
+      ff3_gc=Fungal*Female*`Diet_G/C`*gt3, ff4_gc=Fungal*Female*`Diet_G/C`*gt4, 
+      
+      ff1_gg=Fungal*Female*`Diet_G/G`*gt1, ff2_gg=Fungal*Female*`Diet_G/G`*gt2, 
+      ff3_gg=Fungal*Female*`Diet_G/G`*gt3, ff4_gg=Fungal*Female*`Diet_G/G`*gt4, 
+      
+      ff1_cg=Fungal*Female*`Diet_C/G`*gt1, ff2_cg=Fungal*Female*`Diet_C/G`*gt2, 
+      ff3_cg=Fungal*Female*`Diet_C/G`*gt3, ff4_cg=Fungal*Female*`Diet_C/G`*gt4
+  )
+}
+
+get_time_data = function(data){
+  data = survSplit(data, cut=split_time, end="Day", event="Death", start="Start") %>% 
+    mutate(Diet = gsub(",", "_", Diet),
+           gt1=(Start==0)+0, gt2=(Start==a1)+0, gt3=(Start==a2)+0, gt4=(Start==a3)+0, 
+           Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0) %>% 
+    dummy_cols("Diet") %>% get_interaction()
+  return(data)
+}
+
+category = ungroup(df) %>% select(Treatment,Sex,Diet) %>% unique() %>% set_rownames(NULL) %>%
+   mutate(Diet = gsub(",", "_", Diet), Fungal = (Treatment=="Fungal")+0, Female = (Sex=="F")+0) %>% 
+  dummy_cols("Diet")
+
+time_intervals = data.frame(Start=c(0,a1,a2,a3), Day=c(a1,a2,a3,10), 
+                            gt1=c(1,0,0,0), gt2=c(0,1,0,0), gt3=c(0,0,1,0), gt4=c(0,0,0,1),
+                            Death=0)
+
+pred_surv = function(data){
+  mod = coxph(Surv(Start, Day, Death) ~ 
+                t1_fun + t2_fun + t3_fun + t4_fun + 
+                t1_fem + t2_fem + t3_fem + t4_fem +
+                
+                t1_gg + t2_gg + t3_gg + t4_gg +
+                t1_gc + t2_gc + t3_gc + t4_gc + 
+                t1_cg + t2_cg + t3_cg + t4_cg +
+                
+                ff1 + ff2 + ff3 + ff4 + 
+                
+                f1_gg + f2_gg + f3_gg + f4_gg +
+                f1_gc + f2_gc + f3_gc + f4_gc + 
+                f1_cg + f2_cg + f3_cg + f4_cg +
+                
+                ff1_gg + ff2_gg + ff3_gg + ff4_gg + 
+                ff1_gc + ff2_gc + ff3_gc + ff4_gc + 
+                ff1_cg + ff2_cg + ff3_cg + ff4_cg,
+              data = get_time_data(data))
+  
+  surv = c()
+  for (i in 1:nrow(category)){
+    test = category[rep(i,nrow(time_intervals)),] %>%
+      bind_cols(time_intervals) %>%
+      get_interaction()
+    time = summary(survfit(mod, newdata = test, individual = TRUE))$time
+    insert = setdiff(1:cut_off, time)
+    time = c(time, insert)
+    est = c(1, summary(survfit(mod, newdata = test, individual = TRUE))$surv,
+            rep(NA, length(insert)))
+    surv_i = data.frame(category[i,], est, day = c(0,time)) %>% arrange(day)
+    surv = rbind(surv, surv_i)
+  }
+  return(surv)
+}
+
+est = pred_surv(df) 
+```
 
 
 #### 4. Table of Hazard Ratios
@@ -488,7 +535,7 @@ df_plot = survs %>%
 
 ```{r}
 goal + labs(y="Survival Percent") + 
-  facet_wrap(Treatment~Sex)
+  facet_wrap(~Sex)
 ```
 
 
@@ -501,7 +548,7 @@ df_plot %>%
   ggplot(aes(x=day, y=est, ymin=lower, ymax=upper, linetype=Treatment, color=Diet, shape=Sex)) +
   geom_line() + 
   geom_point() +
-  # geom_errorbar(width=0.3, alpha=0.7) +
+  geom_errorbar(width=0.3, alpha=0.7) +
   ylim(0.35,1) +
   scale_linetype_manual(values = c("Control"="dashed","Fungal"="solid")) +
   labs(linetype="", color="", shape="", y="Survival Probabilities") +
