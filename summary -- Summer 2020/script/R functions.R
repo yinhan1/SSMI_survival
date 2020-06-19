@@ -27,8 +27,8 @@ plot_fun4 = function(d){
     ggplot(aes(x=day, y=est, ymin=lower, ymax=upper, color=tag, linetype=tag,
                group=interaction(Diet,tag))) +
     geom_errorbar(width=0.5,size=0.5,alpha=0.7) +
-    geom_line(size=1) +
-    geom_point(size=1) +
+    # geom_line(size=1) +
+    # geom_point(size=1) +
     scale_x_continuous(breaks=seq(0,12,4)) +
     scale_linetype_manual(values=c("Control Female"="dotted",
                                    "Control Male"="dotted",

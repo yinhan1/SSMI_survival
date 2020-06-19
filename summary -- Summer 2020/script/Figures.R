@@ -284,8 +284,10 @@ ggplot(data = tb_fit,
 
 ### --------------------------    F4    --------------------------  
 
+#### model plot #### 
+
 df = 
-  read.csv("./data/DIET 2 bootstrap.csv") %>% 
+  read.csv("data/DIET 2 bootstrap.csv") %>% 
   select(-X) %>% 
   mutate(Diet = factor(Diet, levels=c("C/C","C/G","G/G","G/C"))) %>% 
   select(c(Treatment,Sex,Diet,Sex,day,est,lower,upper))
@@ -296,16 +298,68 @@ df_initial =
   unique() %>% 
   mutate(day=0, est=1, lower=1, upper=1)
 
-labels = read.csv("./data/DIET 2 raw.csv") %>% 
-  mutate(Diet = factor(Diet, levels=c("C/C","C/G","G/G","G/C"))) %>% 
-  filter(Day==1) %>% 
-  group_by(Diet,Treatment,Sex) %>% 
-  summarise(Initial=sum(Initial.density))
+set_labels = 
+  labels %>% 
+  filter(Diet==d) %>% 
+  mutate(Sex = ifelse(Sex=="M", "Male","Female"),
+         Sex = factor(Sex, levels=c("Male","Female")),
+         tag0 = paste0(Treatment," ",Sex),
+         tag = paste0(Treatment," ",Sex, " (n=",Initial,")")) %>% 
+  arrange(Treatment,Sex)
 
-plot_fun4("C/C") + ylim(0.5,1)
-plot_fun4("C/G") + ylim(0.5,1)
-plot_fun4("G/G") + ylim(0.5,1)
-plot_fun4("G/C") + ylim(0.5,1)
+bind_rows(df,df_initial) %>% 
+  mutate(tag = factor(paste(Treatment, Sex), 
+                      levels=c("Control Male","Control Female",
+                               "Fungal Male","Fungal Female"))) %>% 
+  ggplot(aes(x=day, y=est, ymin=lower, ymax=upper, color=tag, linetype=tag,
+             group=interaction(Diet,tag))) +
+  geom_errorbar(width=0.5,size=0.7,alpha=0.7) +
+  geom_line(size=0.9) +
+  geom_point(size=1) +
+  scale_x_continuous(breaks=seq(0,12,4)) +
+  scale_linetype_manual(values=c("Control Female"="dotted",
+                                 "Control Male"="dotted",
+                                 "Fungal Female"="solid",
+                                 "Fungal Male"="solid"),
+                        labels = set_labels$tag[c(2,4,1,3)],
+                        breaks = set_labels$tag0[c(2,4,1,3)]) +
+  scale_color_manual(values=c("Control Female"="darkgreen",
+                              "Control Male"="brown",
+                              "Fungal Female"="darkgreen",
+                              "Fungal Male"="brown"),
+                     labels = set_labels$tag[c(2,4,1,3)],
+                     breaks = set_labels$tag0[c(2,4,1,3)]) +
+  facet_grid(~Diet) +
+  labs(x="Days after spray", y="Survival Probability", color="", linetype="") +
+  theme_classic()
+
+
+#### raw data plot #### 
+
+read.csv("data/DIET 2 raw.csv") %>% 
+  mutate(Sex = recode(Sex, "F" = "Female", "M" = "Male"),
+         Diet = factor(Diet, 
+                       levels = c("C/C","C/G","G/G","G/C"))) %>% 
+  group_by(Diet, Treatment, Sex, Day) %>% 
+  summarise(Death = sum(Death),
+            Initial = sum(Initial.density)) %>% 
+  group_by(Diet, Treatment, Sex) %>% 
+  mutate(cumDeath = cumsum(Death)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = Day, 
+             y = 1 - cumDeath/Initial,
+             color = paste(Treatment, Sex))) +
+  geom_line() +
+  facet_wrap(~Diet, nrow = 1) +
+  scale_linetype_manual(values=c("Control Female"="dotted",
+                                 "Control Male"="dotted",
+                                 "Fungal Female"="solid",
+                                 "Fungal Male"="solid")) +
+  scale_color_manual(values=c("Control Female"="darkgreen",
+                              "Control Male"="brown",
+                              "Fungal Female"="darkgreen",
+                              "Fungal Male"="brown"))
+
 
 
 ### --------------------------    F5    --------------------------  
