@@ -379,21 +379,22 @@ est = pred_surv(df)
 
 ```{r}
 beta = coef(mod)
-diff = c(1,0,0, # fungal
-         0,0,0, # female
+diff = c(0,0,0,1, # fungal
+         0,0,0,0, # female
          
-         0,0,0, # g_g
-         0,0,0, # g_c
-         1,0,0, # c_g
+         0,0,0,0, # g_g
+         0,0,0,0, # g_c
+         0,0,0,1, # c_g
 
-         1,0,0, # female fungal
+         0,0,0,1, # female fungal
          
-         0,0,0, # g_g fungal
-         0,0,0, # g_c fungal
-         1,0,0, # c_g fungal
+         0,0,0,0, # g_g fungal
+         0,0,0,0, # g_c fungal
+         0,0,0,1, # c_g fungal
     
-         0,0,0, # female g_g fungal
-         1,0,0  # female c_g fungal
+         0,0,0,0, # female g_g fungal
+         0,0,0,0,  # female g_c fungal
+         0,0,0,1  # female c_g fungal
          )
 
 t_obs = (beta%*%diff) / sqrt(t(diff) %*% vcov(mod) %*% diff)
