@@ -35,7 +35,6 @@ library(fastDummies)
 library(survival)
 library(survminer)
 
-setwd("/Users/hanyin/Dropbox (CSU Fullerton)/Research Project/Flies/Kshama -- statistical analysis/Diet #1")
 rep_1 = readxl::read_excel("data/SSMI_Diet_Rep1_for R.xlsx")
 rep_2 = readxl::read_excel("data/SSMI_Diet_Rep2_for R.xlsx")
 rep_3 = readxl::read_excel("data/SSMI_Diet_Rep3_for R.xlsx")
@@ -182,6 +181,7 @@ summary(mod)
 ### 4. Table of Hazard Ratios
 
 ```{r}
+# baseline ccy
 beta = coef(mod)
 diff = c(0,0,0, # fungal
          0,0,0, # male
@@ -192,10 +192,10 @@ diff = c(0,0,0, # fungal
          0,0,0, # male cyc
          0,0,0, # male gg
          
-         0,0,0, # fungal cc
+         -1,0,0, # fungal cc
          0,0,0, # fungal cycy
          0,0,0, # fungal cyc
-         0,0,1, # fungal gg
+         1,0,0, # fungal gg
          
          0,0,0, # fungal male cc
          0,0,0, # fungal male cycy
