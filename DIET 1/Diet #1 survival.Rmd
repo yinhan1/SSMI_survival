@@ -46,6 +46,12 @@ reps = reps %>% mutate_at(cols_to_factor, factor) %>% filter(Day<=12)
 ```
 
 
+
+```{r}
+rep_1 %>% filter(Day == 1)
+```
+
+
 ### Step 0.1: raw data plot
 ```{r}
 # combine replicate

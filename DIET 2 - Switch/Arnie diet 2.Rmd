@@ -57,6 +57,9 @@ df = bind_rows(rep1, rep2, rep3) %>%
          Day<=cut_off)
 # write.csv(df,"DIET 2 raw.csv")
 ```
+```{r}
+View(df)
+```
 
 ### Raw data plot {.tabset}
 
