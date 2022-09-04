@@ -47,11 +47,6 @@ reps = reps %>% mutate_at(cols_to_factor, factor) %>% filter(Day<=12)
 
 
 
-```{r}
-rep_1 %>% filter(Day == 1)
-```
-
-
 ### Step 0.1: raw data plot
 ```{r}
 # combine replicate
@@ -125,6 +120,15 @@ df = bind_rows(dead, alive) %>%
 
 
 ### Step 2: check replicates (good)
+
+```{r}
+df[c('Replicate','Cage_Number','Treatment','Diet','Sex')] %>% unique() %>% View()
+```
+
+
+
+
+
 ```{r}
 fit = survfit(Surv(Day, Death) ~ Replicate, data = df)
 ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)

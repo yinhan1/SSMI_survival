@@ -38,18 +38,18 @@ read.csv("data/SSMI bootstrap.csv") %>%
   geom_point(size = 1) +
   scale_colour_manual(
     values = c(
-      "Control virgin female" = "#32CD32",
-      "Control mated female" = "#64B39B",
-      "Control cohabiting female" = "#006400",
-      "Inoculated virgin female" = "#32CD32",
-      "Inoculated mated female" = "#64B39B",
-      "Inoculated cohabiting female" = "#006400",
-      "Control virgin male" = "#FA8072",
-      "Control mated male" = "#EE2C2C",
-      "Control cohabiting male" = "#BA251F",
-      "Inoculated virgin male" = "#FA8072",
-      "Inoculated mated male" = "#EE2C2C",
-      "Inoculated cohabiting male" = "#BA251F"
+      "Control virgin female" = "#FF83FA",
+      "Control mated female" = "#AB82FF",
+      "Control cohabiting female" = "#5D478B",
+      "Inoculated virgin female" = "#FF83FA",
+      "Inoculated mated female" = "#AB82FF",
+      "Inoculated cohabiting female" = "#5D478B",
+      "Control virgin male" = "#FFA500",
+      "Control mated male" = "#CD8500",
+      "Control cohabiting male" = "#8B5A00",
+      "Inoculated virgin male" = "#FFA500",
+      "Inoculated mated male" = "#CD8500",
+      "Inoculated cohabiting male" = "#8B5A00"
       ),
     breaks = set_breaks, labels = set_labels
     ) + 
@@ -70,7 +70,7 @@ read.csv("data/SSMI bootstrap.csv") %>%
     ),
     breaks = set_breaks, labels = set_labels
   ) +
-  # geom_errorbar(linetype = "solid) +
+  # geom_errorbar(linetype = "solid", alpha = 0.5) +
   labs(x = "Days after spray", y = "Survival Probability", 
        colour = "", linetype = "") +
   thm + ylim(0,1) +
@@ -115,22 +115,22 @@ read.csv("data/SSMI bootstrap.csv") %>%
                                 levels = c("Cohabiting","Virgin","Mated"))) %>% 
   ggplot(aes(x = Day, y = est, ymin = lower, ymax = upper,
              linetype = tag, colour = tag, group = tag)) + 
-  geom_line(size = 0.9) + 
-  geom_point(size = 1) +
+  geom_line(size = 0.5) + 
+  geom_point(size = 0.6) +
   scale_colour_manual(
     values = c(
-      "Control virgin female" = "#32CD32",
-      "Control mated female" = "#64B39B",
-      "Control cohabiting female" = "#006400",
-      "Inoculated virgin female" = "#32CD32",
-      "Inoculated mated female" = "#64B39B",
-      "Inoculated cohabiting female" = "#006400",
-      "Control virgin male" = "#FA8072",
-      "Control mated male" = "#EE2C2C",
-      "Control cohabiting male" = "#BA251F",
-      "Inoculated virgin male" = "#FA8072",
-      "Inoculated mated male" = "#EE2C2C",
-      "Inoculated cohabiting male" = "#BA251F"
+      "Control virgin female" = "#FF83FA",
+      "Control mated female" = "#AB82FF",
+      "Control cohabiting female" = "#5D478B",
+      "Inoculated virgin female" = "#FF83FA",
+      "Inoculated mated female" = "#AB82FF",
+      "Inoculated cohabiting female" = "#5D478B",
+      "Control virgin male" = "#FFA500",
+      "Control mated male" = "#CD8500",
+      "Control cohabiting male" = "#8B5A00",
+      "Inoculated virgin male" = "#FFA500",
+      "Inoculated mated male" = "#CD8500",
+      "Inoculated cohabiting male" = "#8B5A00"
     ),
     breaks = set_breaks, labels = set_labels
   ) + 
@@ -151,7 +151,7 @@ read.csv("data/SSMI bootstrap.csv") %>%
     ),
     breaks = set_breaks, labels = set_labels
   ) +
-  # geom_errorbar(linetype = 'solid', alpha = 0.8, width = 0.6, size = 0.5) +
+  geom_errorbar(linetype = 'solid', alpha = 0.5, width = 0.5, size = 0.5) +
   labs(x = "Days after spray", y = "Survival Probability", 
        colour = "", linetype = "") +
   thm + ylim(0,1) +
@@ -195,18 +195,18 @@ ggplot(data=NULL,
   geom_point(data=surv_rep, size = 0.6) +
   scale_color_manual(
   values = c(
-    "Control virgin female" = "#32CD32",
-    "Control mated female" = "#64B39B",
-    "Control cohabiting female" = "#006400",
-    "Inoculated virgin female" = "#32CD32",
-    "Inoculated mated female" = "#64B39B",
-    "Inoculated cohabiting female" = "#006400",
-    "Control virgin male" = "#FA8072",
-    "Control mated male" = "#EE2C2C",
-    "Control cohabiting male" = "#BA251F",
-    "Inoculated virgin male" = "#FA8072",
-    "Inoculated mated male" = "#EE2C2C",
-    "Inoculated cohabiting male" = "#BA251F"
+    "Control virgin female" = "#FF83FA",
+    "Control mated female" = "#AB82FF",
+    "Control cohabiting female" = "#5D478B",
+    "Inoculated virgin female" = "#FF83FA",
+    "Inoculated mated female" = "#AB82FF",
+    "Inoculated cohabiting female" = "#5D478B",
+    "Control virgin male" = "#FFA500",
+    "Control mated male" = "#CD8500",
+    "Control cohabiting male" = "#8B5A00",
+    "Inoculated virgin male" = "#FFA500",
+    "Inoculated mated male" = "#CD8500",
+    "Inoculated cohabiting male" = "#8B5A00"
   ),
   breaks = set_breaks, labels = set_labels
   ) + 
@@ -267,20 +267,51 @@ ggplot(data = tb_fit,
   ) +
   scale_color_manual(
     values = c(
-      "Control cohabit" = "#006400",
-      "Inoculated cohabit" = "#006400",
-      "Control mated" = "#64B39B",
-      "Inoculated mated" = "#64B39B"
+      "Control cohabit" = "#5D478B",
+      "Inoculated cohabit" = "#5D478B",
+      "Control mated" = "#AB82FF",
+      "Inoculated mated" = "#AB82FF"
     ),
     breaks = set_breaks
   ) +
   theme_classic() +
   labs(x = "Days after spray", 
-       y = "Offspring count per surviving female per day")
+       y = "Offspring count per surviving female")
 
 
 
 ### --------------------------    F3    --------------------------  
+set_line_size = 1.8      
+set_point_size = 2.1  
+
+set_err_size = 1.5     
+set_err_width = 0.5    
+set_alpha = 0.7
+
+df_plot = read.csv('data/GHA bootstrap.csv')
+
+thm = theme(axis.line = element_line(color="gray54", size=0.1, linetype="solid"),
+            panel.background = element_rect(fill = NA),
+            legend.key = element_rect(fill = NA),
+            legend.background = element_rect(fill = NA),
+            plot.title = element_text(size = 15, hjust = 0.5)) 
+
+ggplot(df_plot, aes(x=day, y=est, color=Sex, linetype=Treatment, ymin=lower, ymax=upper)) +
+  geom_line(size = set_line_size) + geom_point(size = set_point_size) + 
+  geom_errorbar(size = set_err_size, width = set_err_width, alpha = set_alpha) +
+  
+  scale_linetype_manual(values = c("Control" = "dotted","GHA" = "solid")) +
+  scale_color_manual(values = c("Female" = "#FF83FA", "Male" = "#FFA500")) +
+  
+  labs(x="Days", y="Survival Probability") +
+  thm +
+  ylim(0,1) +
+  guides(linetype = guide_legend(order = 1), color = guide_legend(order = 2))
+
+
+
+
+
 
 ### --------------------------    F4    --------------------------  
 
@@ -300,7 +331,7 @@ df_initial =
 
 set_labels = 
   labels %>% 
-  filter(Diet==d) %>% 
+  # filter(Diet==d) %>% 
   mutate(Sex = ifelse(Sex=="M", "Male","Female"),
          Sex = factor(Sex, levels=c("Male","Female")),
          tag0 = paste0(Treatment," ",Sex),
@@ -321,14 +352,14 @@ bind_rows(df,df_initial) %>%
                                  "Control Male"="dotted",
                                  "Fungal Female"="solid",
                                  "Fungal Male"="solid"),
-                        labels = set_labels$tag[c(2,4,1,3)],
-                        breaks = set_labels$tag0[c(2,4,1,3)]) +
-  scale_color_manual(values=c("Control Female"="darkgreen",
-                              "Control Male"="brown",
-                              "Fungal Female"="darkgreen",
-                              "Fungal Male"="brown"),
-                     labels = set_labels$tag[c(2,4,1,3)],
-                     breaks = set_labels$tag0[c(2,4,1,3)]) +
+                        labels = c("Control Female (n=609)", "Control Male (n=609)", "Fungal Female (n=576)", "Fungal Male (n=576)"),
+                        breaks = c('Control Female','Control Male','Fungal Female','Fungal Male')) +
+  scale_color_manual(values=c("Control Female"="#5D478B",
+                              "Control Male"="#8B5A00",
+                              "Fungal Female"="#5D478B",
+                              "Fungal Male"="#8B5A00"),
+                     labels = c("Control Female (n=609)", "Control Male (n=609)", "Fungal Female (n=576)", "Fungal Male (n=576)"),
+                     breaks = c('Control Female','Control Male','Fungal Female','Fungal Male')) +
   facet_grid(~Diet) +
   labs(x="Days after spray", y="Survival Probability", color="", linetype="") +
   theme_classic()
@@ -355,10 +386,10 @@ read.csv("data/DIET 2 raw.csv") %>%
                                  "Control Male"="dotted",
                                  "Fungal Female"="solid",
                                  "Fungal Male"="solid")) +
-  scale_color_manual(values=c("Control Female"="darkgreen",
-                              "Control Male"="brown",
-                              "Fungal Female"="darkgreen",
-                              "Fungal Male"="brown"))
+  scale_color_manual(values=c("Control Female"="#5D478B",
+                              "Control Male"="#8B5A00",
+                              "Fungal Female"="#5D478B",
+                              "Fungal Male"="#8B5A00"))
 
 
 
@@ -375,6 +406,7 @@ labels = read.csv("./data/DIET 1 raw.csv") %>%
   summarise(Initial=sum(Initial.density))
 
 
+set_labels = c("Control Female (n=401)", "Control Male (n=422)", "Fungal Female (n=413)", "Fungal Male (n=382)")
 bind_rows(df) %>% 
     group_by(Diet) %>% 
     mutate(tag = factor(paste(Treatment, Sex), 
@@ -382,21 +414,19 @@ bind_rows(df) %>%
                                  "Fungal Male","Fungal Female"))) %>% 
     ggplot(aes(x=day, y=est, ymin=lower, ymax=upper, color=tag, 
                group=interaction(Diet,tag))) +
-    geom_errorbar(width=0.7,size=0.6,alpha=0.7) +
-    geom_line(size=0.8, aes(linetype=tag)) +
-    geom_point(size=1) +
+    # geom_errorbar(width=0.3,size=0.5,alpha=0.5) +
+    geom_line(size=0.6, aes(linetype=tag)) + geom_point(size=0.6) +
     scale_x_continuous(breaks=seq(0,12,4)) +
-    scale_linetype_manual(values=c("Control Female"="dotted",
-                                   "Control Male"="dotted",
-                                   "Fungal Female"="solid",
-                                   "Fungal Male"="solid")) +
-    scale_color_manual(values=c("Control Female"="darkgreen",
-                                "Control Male"="brown",
-                                "Fungal Female"="darkgreen",
-                                "Fungal Male"="brown")) +
+    scale_linetype_manual(
+      values=c("Control Female"="dotted","Control Male"="dotted","Fungal Female"="solid","Fungal Male"="solid"),
+      labels = set_labels,
+      breaks = c('Control Female','Control Male','Fungal Female','Fungal Male')) +
+    scale_color_manual(
+      values=c("Control Female"="#5D478B","Control Male"="#8B5A00","Fungal Female"="#5D478B","Fungal Male"="#8B5A00"),
+      labels = set_labels,
+      breaks = c('Control Female','Control Male','Fungal Female','Fungal Male')) +
     facet_grid(~Diet) +
-    labs(x="Days after spray", y="Survival Probability", color="", linetype="") +
-    theme_classic()
+    labs(x="Days after spray", y="Survival Probability", color="", linetype="") + theme_classic()
     
 
 
@@ -407,7 +437,8 @@ df =
   select(-X) %>% 
   mutate(Diet = factor(Diet, levels=c("C","CY0.5","CY1.0","CY1.5")),
          Sex = ifelse(Sex=="M", "Male","Female"))
-  
+
+set_labels = c("Control Female (n=1268)", "Control Male (n=1268)", "Fungal Female (n=1133)", "Fungal Male (n=1133)")
 bind_rows(df) %>% 
   group_by(Diet) %>% 
   mutate(tag = factor(paste(Treatment, Sex), 
@@ -415,26 +446,21 @@ bind_rows(df) %>%
                                "Fungal Male","Fungal Female"))) %>% 
   ggplot(aes(x=day, y=est, ymin=lower, ymax=upper, color=tag, 
              group=interaction(Diet,tag))) +
-  geom_errorbar(width=0.7,size=0.6,alpha=0.7) +
-  geom_line(aes(linetype=tag), size=0.8) +
-  geom_point(size=1) +
+  # geom_errorbar(width=0.3,size=0.5,alpha=0.5) +
+  geom_line(aes(linetype=tag), size=0.6) +
+  geom_point(size=0.6) +
   scale_x_continuous(breaks=seq(0,12,4)) +
-  scale_linetype_manual(values=c("Control Female"="dotted",
-                                 "Control Male"="dotted",
-                                 "Fungal Female"="solid",
-                                 "Fungal Male"="solid")) +
-  scale_color_manual(values=c("Control Female"="darkgreen",
-                              "Control Male"="brown",
-                              "Fungal Female"="darkgreen",
-                              "Fungal Male"="brown")) +
+  scale_linetype_manual(
+    values=c("Control Female"="dotted","Control Male"="dotted","Fungal Female"="solid","Fungal Male"="solid"),
+    labels = set_labels,
+    breaks = c('Control Female','Control Male','Fungal Female','Fungal Male')) +
+  scale_color_manual(
+    values=c("Control Female"="#5D478B","Control Male"="#8B5A00","Fungal Female"="#5D478B","Fungal Male"="#8B5A00"),
+    labels = set_labels,
+    breaks = c('Control Female','Control Male','Fungal Female','Fungal Male')) +
   facet_grid(~Diet) +
   labs(x="Days after spray", y="Survival Probability", color="", linetype="") +
   theme_classic()
-
-
-
-
-### --------------------------    FS1    --------------------------  
 
 
 

@@ -2,7 +2,10 @@
 # Last Edited: June 6, 2020
 
 
-
+firstup <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
 
 
 ### --------------------------    Figure 1    --------------------------  ###

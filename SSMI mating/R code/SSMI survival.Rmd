@@ -105,8 +105,8 @@ rep_5 = df_conv(rep_5, 20)
 df = rbind(rep_12, rep_3, rep_4, rep_5)
 summary(df)
 
-# df %>% filter(Sex=="M",Treatment=="Fungal",
-#               Mating_status=="Mated") %>% nrow()
+df %>% filter(Sex=="M",Treatment=="Fungal",
+              Mating_status=="Mated") %>% nrow()
 ```
 
 ### Set Up Parameters
@@ -132,18 +132,42 @@ g = guides(linetype = guide_legend(order = 1), color = guide_legend(order = 2))
 
 ### Replicate Test
 ```{r echo=FALSE, fig.height=2.5, fig.width=5}
-# level_mat = c("Virgin","Virgin CO2","Mated","Cohabit")
-# tb = df %>% mutate(Mating_status = factor(Mating_status, levels = level_mat),
-#                    Rep = Replicate)
-# fit = survfit(Surv(Day, Death) ~ Rep, data = tb)
-# ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
-# pairwise_survdiff(Surv(Day, Death == 1) ~ Rep,
-#                   p.adjust.method = "holm", data = tb)
-df = df %>% filter(Replicate != 1)
+level_mat = c("Virgin","Virgin CO2","Mated","Cohabit")
+tb = df %>% mutate(Mating_status = factor(Mating_status, levels = level_mat),
+                   Rep = Replicate)
+fit = survfit(Surv(Day, Death) ~ Rep, data = tb)
+ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+pairwise_survdiff(Surv(Day, Death == 1) ~ Rep,
+                  p.adjust.method = "holm", data = tb)
+# df = df %>% filter(Replicate != 1)
 # df %>% filter(Sex=="M",Treatment=="Fungal",
 #               Mating_status=="Virgin") %>% nrow()
 # write_csv(df, "SSMI raw.csv")
 ```
+
+
+```{r}
+tb = df %>% 
+  filter((Replicate %in% c(2,3,4,5)) & 
+        (Treatment == 'Fungal') & (Mating_status == 'Cohabit') & (Sex=='M'))
+sum(tb$Death)
+
+# fit = survfit(Surv(Day, Death) ~ Cage_Number, data = tb)
+# ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
+# pairwise_survdiff(Surv(Day, Death == 1) ~ Cage_Number,
+#                   p.adjust.method = "holm", data = tb)
+
+survdiff(Surv(Day, Death) ~ Replicate , data = tb)
+```
+
+```{r}
+tb2 = df %>% filter(Replicate == 2, Mating_status != 'Virgin CO2')
+tb3 = df %>% filter(Replicate == 3, Mating_status != 'Virgin CO2')
+tb4 = df %>% filter(Replicate == 4, Mating_status != 'Virgin CO2')
+tb5 = df %>% filter(Replicate == 5, Mating_status != 'Virgin CO2')
+```
+
+
 
 \newpage
 ## Section 1: Raw data
