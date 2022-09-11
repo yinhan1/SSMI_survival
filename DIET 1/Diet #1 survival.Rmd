@@ -136,6 +136,19 @@ pairwise_survdiff(Surv(Day, Death == 1) ~ Replicate, p.adjust.method = "holm", d
 ```
 
 
+```{r}
+p_val = function(i){
+  set.seed(i)
+  tb = df %>% 
+    group_by(Replicate,Treatment,Diet,Sex) %>% slice_sample(n = 100, replace = TRUE)
+  t = survdiff(Surv(Day, Death) ~ Replicate + strata(Treatment) + strata(Diet) + strata(Sex), data = tb)
+  print(t)
+  return(t$pvalue)
+}
+p_val(2099)
+```
+
+
 ### Step 3: cox model
 ```{r}
 # check proportionality

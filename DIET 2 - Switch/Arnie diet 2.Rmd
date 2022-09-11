@@ -210,6 +210,27 @@ test_replicate("G/C")
 test_replicate("G/G")
 ```
 
+
+
+```{r}
+p_val = function(i){
+  set.seed(i)
+  tb = df %>%
+    group_by(Replicate,Treatment,Diet,Sex) %>% slice_sample(n = 10, replace = TRUE)
+  t = survdiff(Surv(Day, Death) ~ Replicate + strata(Treatment) + strata(Diet) + strata(Sex), data = tb)
+  print(t)
+  return(t$pvalue)
+}
+p_val(57)
+```
+
+
+
+
+
+
+
+
 ### Cox model 
 
 #### Goal
@@ -234,6 +255,12 @@ mod = coxph(Surv(Day, Death) ~ strata(Treatment) + Diet + Sex, data = df)
 pred = survfit(mod)
 plot(pred, lty = 1:2, col = c("red","blue"))
 ```
+
+
+
+
+
+
 
 ##### Diet
 

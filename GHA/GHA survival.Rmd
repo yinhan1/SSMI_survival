@@ -83,6 +83,17 @@ df = df %>% mutate(Fungal=(Treatment=="GHA")+0, Male=(Sex=="M")+0)
 
 
 
+
+```{r}
+set.seed(4)
+tb = df %>% group_by(Replicate,Treatment,Sex) %>% slice_sample(n = 150, replace = TRUE)
+t = survdiff(Surv(Day, Death) ~ Replicate + strata(Treatment) + strata(Sex), data = tb)
+t
+t$pvalue
+```
+
+
+
 ## Raw Data Plot
 
 ```{r calculate and plot survival percent}

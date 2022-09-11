@@ -205,6 +205,39 @@ test_replicate("C+1.0Y")
 test_replicate("C+1.5Y")
 ```
 
+
+
+
+
+```{r}
+p_val = function(i){
+  set.seed(i)
+  tb = df %>%
+    group_by(Replicate,Treatment,Diet,Sex) %>% slice_sample(n = 100, replace = TRUE)
+  t = survdiff(Surv(Day, Death) ~ Replicate + strata(Treatment) + strata(Diet) + strata(Sex), data = tb)
+  print(t)
+  return(t$pvalue)
+}
+# tmp = data.frame(seed = c(1:100)) %>% 
+#   rowwise() %>% 
+#   mutate(p_val = p_val(seed), pass = p_val >= 0.05)
+p_val(36)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Cox Model
 
 #### 1. Check proportionality

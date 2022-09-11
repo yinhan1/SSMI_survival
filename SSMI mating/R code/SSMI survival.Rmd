@@ -77,9 +77,6 @@ assign_mt = function(row){
 ### Import Data File
 ```{r load data file, echo=FALSE}
 library(readxl)
-
-setwd("/Users/hanyin/Dropbox (CSU Fullerton)/Research Project/Flies/Kshama -- statistical analysis/SSMI mating")
-
 rep_12 = read_excel("data/Replicate 1 & 2 for R_SSMI.xlsx") 
 rep_3 = read_excel("data/SSMI_Rep3 for R.xlsx")
 rep_4 = read_excel("data/Replicate 4_R.xlsx")
@@ -91,7 +88,6 @@ library(kableExtra)
 library(tidyverse)
 library(reshape2)
 library(stringr)
-
 library(survival)
 library(survminer)
 
@@ -133,12 +129,10 @@ g = guides(linetype = guide_legend(order = 1), color = guide_legend(order = 2))
 ### Replicate Test
 ```{r echo=FALSE, fig.height=2.5, fig.width=5}
 level_mat = c("Virgin","Virgin CO2","Mated","Cohabit")
-tb = df %>% mutate(Mating_status = factor(Mating_status, levels = level_mat),
-                   Rep = Replicate)
+tb = df %>% mutate(Mating_status = factor(Mating_status, levels = level_mat), Rep = Replicate)
 fit = survfit(Surv(Day, Death) ~ Rep, data = tb)
 ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
-pairwise_survdiff(Surv(Day, Death == 1) ~ Rep,
-                  p.adjust.method = "holm", data = tb)
+pairwise_survdiff(Surv(Day, Death == 1) ~ Rep, p.adjust.method = "holm", data = tb)
 # df = df %>% filter(Replicate != 1)
 # df %>% filter(Sex=="M",Treatment=="Fungal",
 #               Mating_status=="Virgin") %>% nrow()
@@ -147,18 +141,18 @@ pairwise_survdiff(Surv(Day, Death == 1) ~ Rep,
 
 
 ```{r}
-tb = df %>% 
-  filter((Replicate %in% c(2,3,4,5)) & 
-        (Treatment == 'Fungal') & (Mating_status == 'Cohabit') & (Sex=='M'))
-sum(tb$Death)
-
-# fit = survfit(Surv(Day, Death) ~ Cage_Number, data = tb)
-# ggsurvplot(fit, surv.median.line = "hv", pval = TRUE)
-# pairwise_survdiff(Surv(Day, Death == 1) ~ Cage_Number,
-#                   p.adjust.method = "holm", data = tb)
-
-survdiff(Surv(Day, Death) ~ Replicate , data = tb)
+set.seed(57)
+tb = df %>% filter((Replicate %in% c(2,3,4,5)) & (Mating_status != 'Virgin CO2')) %>%
+  group_by(Replicate,Treatment,Mating_status,Sex) %>%
+  slice_sample(n = 50, replace = TRUE)
+t = survdiff(Surv(Day, Death) ~ Replicate + strata(Treatment) + strata(Mating_status) + strata(Sex), data = tb)
+t
+t$pvalue
 ```
+
+
+
+
 
 ```{r}
 tb2 = df %>% filter(Replicate == 2, Mating_status != 'Virgin CO2')
